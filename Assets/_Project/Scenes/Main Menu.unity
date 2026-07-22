@@ -665,6 +665,7 @@ GameObject:
   - component: {fileID: 502001877}
   - component: {fileID: 502001876}
   - component: {fileID: 502001879}
+  - component: {fileID: 502001880}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -790,6 +791,19 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &502001880
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 502001875}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84dddeb440f9d234eb4fc9a8bfd5a6ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkyboxRotator
+  speed: 0.8
 --- !u!1 &792615372
 GameObject:
   m_ObjectHideFlags: 0
