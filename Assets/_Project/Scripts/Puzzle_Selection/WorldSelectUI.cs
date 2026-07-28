@@ -6,6 +6,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 {
     public List<WorldData> worlds;
     public WorldCardUI worldCard;   // the ONE card object, dragged in directly
+    public PuzzleGridUI puzzleGrid;  
 
     private int currentIndex = 0;
     private bool isHovering = false;
@@ -35,6 +36,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
     void UpdateDisplay()
     {
         worldCard.Setup(worlds[currentIndex]);
+        puzzleGrid.Populate(worlds[currentIndex].puzzles);
     }
 
     public void OnPointerEnter(PointerEventData eventData) => isHovering = true;

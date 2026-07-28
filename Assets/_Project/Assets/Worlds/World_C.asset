@@ -13,4 +13,5 @@ MonoBehaviour:
   m_Name: World_C
   m_EditorClassIdentifier: Assembly-CSharp::WorldData
   worldName: World C
-  puzzles: []
+  puzzles:
+  - {fileID: 11400000, guid: 427c5390572f4af47b802ca2dfacdf49, type: 2}

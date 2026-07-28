@@ -7,5 +7,13 @@ public class StandardPuzzleData : PuzzleData
     public int targetScore;
     public List<int> availableNumbers;
     public List<string> availableOperations;
-    public int layout; // Change this to a custom datatype possibly
+    public int layout;
+
+    [Range(1, 5)]
+    public int starRating = 1;
+
+    public override string GetDisplayTarget()
+    {
+        return targetScore.ToString();
+    }
 }

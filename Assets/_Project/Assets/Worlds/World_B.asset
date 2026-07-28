@@ -13,5 +13,7 @@ MonoBehaviour:
   m_Name: World_B
   m_EditorClassIdentifier: Assembly-CSharp::WorldData
   worldName: World B
-  previewImage: {fileID: 10915, guid: 0000000000000000f000000000000000, type: 0}
-  puzzles: []
+  puzzles:
+  - {fileID: 11400000, guid: 87d4dfe9bc9b2b2409e1fc8785abf7b0, type: 2}
+  - {fileID: 11400000, guid: 36c553ab03e7ad443b5e12431e736e0c, type: 2}
+  - {fileID: 11400000, guid: 17e1603858cd0db43a4c83ba2a5d30fa, type: 2}

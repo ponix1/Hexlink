@@ -9,8 +9,16 @@ public class PuzzleCardView : MonoBehaviour
 
     public void Setup(PuzzleData data)
     {
-        puzzleNameText.text = data.PuzzleName;
-        targetNumText.text = data.TargetNumber.ToString();
-        starsText.text = new string('★', data.StarRating);
+        puzzleNameText.text = data.puzzleTitle;
+        targetNumText.text = data.GetDisplayTarget();
+
+        if (data is StandardPuzzleData standardData)
+        {
+            starsText.text = new string('*', standardData.starRating);
+        }
+        else
+        {
+            starsText.text = "";
+        }
     }
 }
