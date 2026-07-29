@@ -20,5 +20,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/Level_Select.unity
     guid: cbf61aa5405ae824ab65c2b9041b2202
+  - enabled: 1
+    path: Assets/_Project/Scenes/Puzzle_Play.unity
+    guid: a85edd077a1521942bccbc574973c5f6
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

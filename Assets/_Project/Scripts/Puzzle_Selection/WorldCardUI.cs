@@ -8,6 +8,5 @@ public class WorldCardUI : MonoBehaviour
     public void Setup(WorldData data)
     {
         worldNameText.text = data.worldName;
-        // later: update preview image, unlocked-state visuals, etc. here too
     }
 }
