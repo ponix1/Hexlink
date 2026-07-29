@@ -28,7 +28,9 @@ public class PuzzleCardView : MonoBehaviour
 
         if (data is StandardPuzzleData standardData)
         {
-            starsText.text = new string('*', standardData.starRating);
+            string stars = "";
+            for (int i = 0; i < standardData.starRating; i++) stars += "* ";
+            starsText.text = stars.Trim();
         }
         else
         {
