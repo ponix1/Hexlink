@@ -6,7 +6,7 @@ public class StandardPuzzleData : PuzzleData
 {
     public int targetScore;
     public List<int> availableNumbers;
-    public List<string> availableOperations;
+    public List<string> disabledOperations;
     public int layout;
 
     [Range(1, 5)]
