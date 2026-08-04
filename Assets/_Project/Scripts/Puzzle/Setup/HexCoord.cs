@@ -24,4 +24,11 @@ public struct HexCoord
         HexCoord d = directions[direction];
         return new HexCoord(q + d.q, r + d.r);
     }
+
+    public Vector3 ToWorldPosition(float hexSize)
+    {
+        float worldX = hexSize * (Mathf.Sqrt(3f) * q + Mathf.Sqrt(3f) * 0.5f * r);
+        float worldZ = hexSize * (1.5f * r);
+        return new Vector3(worldX, 0f, worldZ);
+    }
 }
