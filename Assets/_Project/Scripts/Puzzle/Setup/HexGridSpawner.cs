@@ -1,10 +1,15 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class HexGridSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject hexTilePrefab;
     [SerializeField] private float hexSize = 1f;
     [SerializeField] private float spacingMultiplier = 1f;
+
+    private Dictionary<HexCoord, GameObject> spawnedTiles = new Dictionary<HexCoord, GameObject>();
+
+    public IReadOnlyDictionary<HexCoord, GameObject> SpawnedTiles => spawnedTiles;
 
     private void Start()
     {
@@ -42,6 +47,8 @@ public class HexGridSpawner : MonoBehaviour
 
         HexTileIdentity identity = tile.AddComponent<HexTileIdentity>();
         identity.coordinate = coord;
+
+        spawnedTiles[coord] = tile;
     }
-    
+
 }

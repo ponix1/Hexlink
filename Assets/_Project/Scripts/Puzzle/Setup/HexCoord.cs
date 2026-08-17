@@ -1,7 +1,7 @@
 using UnityEngine;
 
 [System.Serializable]
-public struct HexCoord
+public struct HexCoord : System.IEquatable<HexCoord>
 {
     public int q;
     public int r;
@@ -30,5 +30,20 @@ public struct HexCoord
         float worldX = hexSize * (Mathf.Sqrt(3f) * q + Mathf.Sqrt(3f) * 0.5f * r);
         float worldZ = hexSize * (1.5f * r);
         return new Vector3(worldX, 0f, worldZ);
+    }
+
+    public bool Equals(HexCoord other)
+    {
+        return q == other.q && r == other.r;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is HexCoord other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return System.HashCode.Combine(q, r);
     }
 }

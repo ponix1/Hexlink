@@ -4,6 +4,7 @@ public class HexTileSelector : MonoBehaviour
 {
     [SerializeField] private Camera targetCamera;
     [SerializeField] private Color highlightColor = Color.yellow;
+    [SerializeField] private TileInventoryUI inventoryUI;
 
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
@@ -18,6 +19,7 @@ public class HexTileSelector : MonoBehaviour
     private void Update()
     {
         UpdateHover();
+        CheckForClick();
     }
 
     private void UpdateHover()
@@ -40,6 +42,21 @@ public class HexTileSelector : MonoBehaviour
         }
 
         ClearHover();
+    }
+
+    private void CheckForClick()
+    {
+        if (Input.GetMouseButtonDown(0) && hoveredRenderer != null)
+        {
+            HexTileIdentity identity = hoveredRenderer.GetComponentInParent<HexTileIdentity>();
+            string tileToPlace = inventoryUI.CurrentSelectedTile;
+
+            if (identity != null && !string.IsNullOrEmpty(tileToPlace))
+            {
+                // Now you have both the Hex location AND the Tile to place!
+                Debug.Log($"Placing '{tileToPlace}' at hex: {identity.gameObject.name}");
+            }
+        }
     }
 
     private void SetHover(MeshRenderer renderer)

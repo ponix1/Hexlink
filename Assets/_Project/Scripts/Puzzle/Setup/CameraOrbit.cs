@@ -4,8 +4,14 @@ public class CameraOrbit : MonoBehaviour
 {
     [SerializeField] private float rotationSpeed = 5f;
 
+    private float currentHorizontalAngle;
+    private float currentVerticalAngle;
+
     private void Start()
     {
+        currentHorizontalAngle = transform.eulerAngles.y;
+        currentVerticalAngle = transform.eulerAngles.x;
+
         Camera childCamera = GetComponentInChildren<Camera>();
         if (childCamera != null)
         {
@@ -18,7 +24,12 @@ public class CameraOrbit : MonoBehaviour
         if (Input.GetMouseButton(1))
         {
             float mouseX = Input.GetAxis("Mouse X");
-            transform.Rotate(Vector3.up, mouseX * rotationSpeed, Space.World);
+            float mouseY = Input.GetAxis("Mouse Y");
+
+            currentHorizontalAngle += mouseX * rotationSpeed;
+            currentVerticalAngle -= mouseY * rotationSpeed;
+
+            transform.eulerAngles = new Vector3(currentVerticalAngle, currentHorizontalAngle, 0f);
         }
     }
 }
