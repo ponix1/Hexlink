@@ -5,19 +5,26 @@ using System.Collections;
 
 public class PuzzleDataDebugDisplay : MonoBehaviour
 {
+    private const float BoxWidth = 320f;
+    private const float BoxHeight = 260f;
+    private const float Margin = 10f;
+
     void OnGUI()
     {
         PuzzleData data = PuzzleSelection.SelectedPuzzle;
 
         GUIStyle style = new GUIStyle(GUI.skin.label);
-        style.fontSize = 20;
+        style.fontSize = 12;
         style.normal.textColor = Color.white;
 
-        GUI.Box(new Rect(10, 10, 500, 400), "");
+        float boxX = Margin;
+        float boxY = Screen.height - BoxHeight - Margin;
+
+        GUI.Box(new Rect(boxX, boxY, BoxWidth, BoxHeight), "");
 
         if (data == null)
         {
-            GUI.Label(new Rect(20, 20, 480, 30), "PuzzleSelection.SelectedPuzzle is NULL", style);
+            GUI.Label(new Rect(boxX + 10, boxY + 10, BoxWidth - 20, 20), "PuzzleSelection.SelectedPuzzle is NULL", style);
             return;
         }
 
@@ -43,7 +50,7 @@ public class PuzzleDataDebugDisplay : MonoBehaviour
             currentType = currentType.BaseType;
         }
 
-        GUI.Label(new Rect(20, 20, 480, 380), sb.ToString(), style);
+        GUI.Label(new Rect(boxX + 10, boxY + 10, BoxWidth - 20, BoxHeight - 20), sb.ToString(), style);
     }
 
     private string FormatValue(object value)
