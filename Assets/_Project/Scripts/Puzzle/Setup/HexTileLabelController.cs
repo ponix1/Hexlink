@@ -39,12 +39,16 @@ public class HexTileLabelController : MonoBehaviour
             return;
         }
 
-        GameObject label = Instantiate(tileLabelPrefab, hexTile.transform);
-        label.transform.localPosition = new Vector3(0f, 0f, 2.08f);
+        GameObject placedTile = Instantiate(tileLabelPrefab, hexTile.transform);
+        placedTile.transform.localPosition = new Vector3(0f, 0f, 1.99f);
+        placedTile.transform.rotation = Quaternion.Euler(-90f, 180f, 0f);
 
-        TMPro.TextMeshPro textMesh = label.GetComponent<TMPro.TextMeshPro>();
-        textMesh.text = tile.GetDisplayValue();
+        Extruded3DText labelText = placedTile.GetComponentInChildren<Extruded3DText>();
+        if (labelText != null)
+        {
+            labelText.SetText(tile.GetDisplayValue());
+        }
 
-        activeLabels[coord] = label;
+        activeLabels[coord] = placedTile;
     }
 }

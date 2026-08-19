@@ -53,7 +53,7 @@ public static class TileDataFactory
 {
     public static TileData CreateFromSymbol(string symbol)
     {
-        // Numbers 0-9
+        // Numbers 0-9  
         if (int.TryParse(symbol, out int numberValue))
         {
             return new NumberTileData { value = numberValue };

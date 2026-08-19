@@ -902,7 +902,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HexTileLabelController
   hexGridSpawner: {fileID: 1642298254}
-  tileLabelPrefab: {fileID: 4487936620041456640, guid: 5a326139dfcb1744aa1e66fc9eb45bd2, type: 3}
+  tileLabelPrefab: {fileID: 8638633760578285311, guid: 8f07358edfce8ac46bcf93f72445633d, type: 3}
 --- !u!1 &258816878
 GameObject:
   m_ObjectHideFlags: 0
@@ -2480,6 +2480,7 @@ MonoBehaviour:
   targetCamera: {fileID: 1704618576}
   highlightColor: {r: 0.7736294, g: 0.7895216, b: 0.8962264, a: 1}
   inventoryUI: {fileID: 920922218}
+  labelController: {fileID: 210320709}
 --- !u!4 &903225424
 Transform:
   m_ObjectHideFlags: 0
@@ -4661,7 +4662,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 0}
+      - m_Target: {fileID: 920922218}
         m_TargetAssemblyTypeName: TileInventoryUI, Assembly-CSharp
         m_MethodName: SelectTile
         m_Mode: 5

@@ -5,6 +5,7 @@ public class HexTileSelector : MonoBehaviour
     [SerializeField] private Camera targetCamera;
     [SerializeField] private Color highlightColor = Color.yellow;
     [SerializeField] private TileInventoryUI inventoryUI;
+    [SerializeField] private HexTileLabelController labelController;
 
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
@@ -53,8 +54,11 @@ public class HexTileSelector : MonoBehaviour
 
             if (identity != null && !string.IsNullOrEmpty(tileToPlace))
             {
-                // Now you have both the Hex location AND the Tile to place!
-                Debug.Log($"Placing '{tileToPlace}' at hex: {identity.gameObject.name}");
+                TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
+                if (tileData != null)
+                {
+                    labelController.boardState.PlaceTile(identity.coordinate, tileData);
+                }
             }
         }
     }
