@@ -4,7 +4,7 @@ using TMPro;
 public class Extruded3DText : MonoBehaviour
 {
     [SerializeField] private TextMeshPro frontText;
-    [SerializeField] private int layerCount = 5;
+    [SerializeField] private int layerCount = 15;
     [SerializeField] private float layerDepth = 0.03f;
     [SerializeField] private Color frontColor = Color.white;
     [SerializeField] private Color backColor = new Color(0.3f, 0.3f, 0.3f);

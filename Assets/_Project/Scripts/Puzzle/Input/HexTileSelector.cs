@@ -47,9 +47,24 @@ public class HexTileSelector : MonoBehaviour
 
     private void CheckForClick()
     {
-        if (Input.GetMouseButtonDown(0) && hoveredRenderer != null)
+        if (hoveredRenderer == null)
         {
-            HexTileIdentity identity = hoveredRenderer.GetComponentInParent<HexTileIdentity>();
+            return;
+        }
+
+        HexTileIdentity identity = hoveredRenderer.GetComponentInParent<HexTileIdentity>();
+
+        if (Input.GetMouseButtonDown(2))
+        {
+            if (identity != null && labelController.boardState.HasTile(identity.coordinate))
+            {
+                labelController.boardState.RemoveTile(identity.coordinate);
+            }
+            return;
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
             string tileToPlace = inventoryUI.CurrentSelectedTile;
 
             if (identity != null && !string.IsNullOrEmpty(tileToPlace))
