@@ -5,6 +5,10 @@ using TMPro;
 
 public class InfoTabBuilder
 {
+    // Shared sizing so header numbers line up with the cells beneath them.
+    private const float RowLabelWidth = 40f;
+    private const float CellSize = 60f;
+
     [MenuItem("Hexlink/Build Info Tab")]
     public static void Build()
     {
@@ -36,54 +40,20 @@ public class InfoTabBuilder
         contentRT.offsetMax = new Vector2(-4f, -4f);
         content.GetComponent<Image>().color = Color.white;
 
-        // --- MainRow ---
-        GameObject mainRow = new GameObject("MainRow", typeof(RectTransform), typeof(HorizontalLayoutGroup));
-        mainRow.transform.SetParent(content.transform, false);
-        RectTransform mainRowRT = mainRow.GetComponent<RectTransform>();
-        mainRowRT.anchorMin = Vector2.zero;
-        mainRowRT.anchorMax = Vector2.one;
-        mainRowRT.offsetMin = Vector2.zero;
-        mainRowRT.offsetMax = Vector2.zero;
-        HorizontalLayoutGroup mainRowHLG = mainRow.GetComponent<HorizontalLayoutGroup>();
-        mainRowHLG.childAlignment = TextAnchor.UpperLeft;
-        mainRowHLG.childForceExpandWidth = true;
-        mainRowHLG.childForceExpandHeight = true;
-        mainRowHLG.childControlWidth = true;
-        mainRowHLG.childControlHeight = true;
-        mainRowHLG.padding = new RectOffset(10, 10, 10, 10);
-        mainRowHLG.spacing = 10f;
-
-        // --- LeftPanel ---
-        GameObject leftPanel = CreateVerticalGroup("LeftPanel", mainRow.transform, TextAnchor.UpperLeft, 4f);
-        LayoutElement leftLE = leftPanel.AddComponent<LayoutElement>();
-        leftLE.preferredWidth = 220f;
-        leftLE.flexibleWidth = 0f;
-
-        CreateTMP("TargetText", leftPanel.transform, "Target: 345", 28, FontStyles.Bold);
-        CreateTMP("RestrictionsText", leftPanel.transform, "Restrictions: None", 16, FontStyles.Normal);
-
-        GameObject spacer = new GameObject("Spacer", typeof(RectTransform), typeof(LayoutElement));
-        spacer.transform.SetParent(leftPanel.transform, false);
-        spacer.GetComponent<LayoutElement>().flexibleHeight = 1f;
-
-        CreateTMP("DifficultyText", leftPanel.transform, "Difficulty: 5", 16, FontStyles.Normal);
-
-        // --- Divider ---
-        GameObject divider = new GameObject("Divider", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-        divider.transform.SetParent(mainRow.transform, false);
-        divider.GetComponent<Image>().color = Color.black;
-        LayoutElement dividerLE = divider.GetComponent<LayoutElement>();
-        dividerLE.preferredWidth = 3f;
-        dividerLE.flexibleHeight = 1f;
-
-        // --- RightPanel: ScrollRect holding dynamically-instantiated cycle rows ---
-        GameObject rightPanel = new GameObject("RightPanel", typeof(RectTransform), typeof(LayoutElement), typeof(ScrollRect), typeof(Image));
-        rightPanel.transform.SetParent(mainRow.transform, false);
-        rightPanel.GetComponent<LayoutElement>().flexibleWidth = 1f;
-        rightPanel.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f); // transparent, needed for raycast area
+        // --- GridPanel: the 2D scrollable grid (processors x time-step columns).
+        // This is now the ONLY thing inside Content — it fills the entire tab,
+        // matching the reference image (no side panel, no divider).
+        GameObject gridPanel = new GameObject("GridPanel", typeof(RectTransform), typeof(ScrollRect), typeof(Image));
+        gridPanel.transform.SetParent(content.transform, false);
+        RectTransform gridPanelRT = gridPanel.GetComponent<RectTransform>();
+        gridPanelRT.anchorMin = Vector2.zero;
+        gridPanelRT.anchorMax = Vector2.one;
+        gridPanelRT.offsetMin = new Vector2(10f, 10f);
+        gridPanelRT.offsetMax = new Vector2(-10f, -10f);
+        gridPanel.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0f); // transparent, needed for raycast area
 
         GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-        viewport.transform.SetParent(rightPanel.transform, false);
+        viewport.transform.SetParent(gridPanel.transform, false);
         RectTransform viewportRT = viewport.GetComponent<RectTransform>();
         viewportRT.anchorMin = Vector2.zero;
         viewportRT.anchorMax = Vector2.one;
@@ -92,90 +62,211 @@ public class InfoTabBuilder
         viewport.GetComponent<Image>().color = new Color(1f, 1f, 1f, 0.01f); // near-invisible, required for Mask
         viewport.GetComponent<Mask>().showMaskGraphic = false;
 
-        GameObject scrollContent = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
-        scrollContent.transform.SetParent(viewport.transform, false);
-        RectTransform scrollContentRT = scrollContent.GetComponent<RectTransform>();
-        scrollContentRT.anchorMin = new Vector2(0f, 1f);
-        scrollContentRT.anchorMax = new Vector2(1f, 1f);
-        scrollContentRT.pivot = new Vector2(0.5f, 1f);
-        scrollContentRT.offsetMin = new Vector2(0f, 0f);
-        scrollContentRT.offsetMax = new Vector2(0f, 0f);
+        // GridContent: rows stack vertically (one per processor). Each row's own width grows
+        // horizontally as columns are added, so this container must NOT force-expand child width —
+        // otherwise every row would stretch to the viewport width instead of hugging its own content,
+        // which would break horizontal scrolling.
+        GameObject gridContent = new GameObject("GridContent", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+        gridContent.transform.SetParent(viewport.transform, false);
+        RectTransform gridContentRT = gridContent.GetComponent<RectTransform>();
+        gridContentRT.anchorMin = new Vector2(0f, 1f);
+        gridContentRT.anchorMax = new Vector2(0f, 1f);
+        gridContentRT.pivot = new Vector2(0f, 1f);
 
-        VerticalLayoutGroup scrollVLG = scrollContent.GetComponent<VerticalLayoutGroup>();
-        scrollVLG.childAlignment = TextAnchor.UpperLeft;
-        scrollVLG.childForceExpandWidth = true;
-        scrollVLG.childForceExpandHeight = false;
-        scrollVLG.childControlWidth = true;
-        scrollVLG.childControlHeight = true;
-        scrollVLG.spacing = 2f;
+        VerticalLayoutGroup gridVLG = gridContent.GetComponent<VerticalLayoutGroup>();
+        gridVLG.childAlignment = TextAnchor.UpperLeft;
+        gridVLG.childForceExpandWidth = false;
+        gridVLG.childForceExpandHeight = false;
+        gridVLG.childControlWidth = false;
+        gridVLG.childControlHeight = false;
+        gridVLG.spacing = 2f;
 
-        ContentSizeFitter csf = scrollContent.GetComponent<ContentSizeFitter>();
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        ContentSizeFitter gridCSF = gridContent.GetComponent<ContentSizeFitter>();
+        gridCSF.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        gridCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        ScrollRect scrollRect = rightPanel.GetComponent<ScrollRect>();
+        ScrollRect scrollRect = gridPanel.GetComponent<ScrollRect>();
         scrollRect.viewport = viewportRT;
-        scrollRect.content = scrollContentRT;
-        scrollRect.horizontal = false;
-        scrollRect.vertical = true;
+        scrollRect.content = gridContentRT;
+        scrollRect.horizontal = true; // columns can extend rightward
+        scrollRect.vertical = true;   // processor rows can extend downward
         scrollRect.movementType = ScrollRect.MovementType.Clamped;
 
-        // --- CycleRowTemplate: one row = [number label] + [instruction token strip] + [divider line] ---
-        // This lives under Content, disabled, and is Instantiate()'d at runtime — one copy per cycle.
-        // A controller script duplicates it, sets the number, and appends instruction tokens
-        // (hex icon / arrow / hex icon / comma, etc.) into InstructionContainer as the player builds code.
-        GameObject rowTemplate = new GameObject("CycleRowTemplate", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
-        rowTemplate.transform.SetParent(scrollContent.transform, false);
-        VerticalLayoutGroup rowVLG = rowTemplate.GetComponent<VerticalLayoutGroup>();
-        rowVLG.childAlignment = TextAnchor.UpperLeft;
-        rowVLG.childForceExpandWidth = true;
-        rowVLG.childForceExpandHeight = false;
-        rowVLG.childControlWidth = true;
-        rowVLG.childControlHeight = true;
-        rowVLG.spacing = 2f;
-        rowTemplate.GetComponent<LayoutElement>().preferredHeight = 40f;
+        // --- ColumnHeaderRow: ACTIVE (not a template) — the numbers-across-the-top row (1, 2, 3...).
+        // Starts with just the leading spacer; runtime code appends a HeaderCellTemplate copy
+        // per column, keeping it in sync whenever a new column is added to any processor row.
+        GameObject headerRow = new GameObject("ColumnHeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        headerRow.transform.SetParent(gridContent.transform, false);
+        HorizontalLayoutGroup headerHLG = headerRow.GetComponent<HorizontalLayoutGroup>();
+        headerHLG.childAlignment = TextAnchor.MiddleLeft;
+        headerHLG.childForceExpandWidth = false;
+        headerHLG.childForceExpandHeight = false;
+        headerHLG.childControlWidth = false;
+        headerHLG.childControlHeight = false;
+        headerHLG.spacing = 2f;
+        headerRow.GetComponent<LayoutElement>().preferredHeight = 24f;
 
-        // Number label ("1", "2", ...) sits above the instruction strip, small, like the reference image.
-        GameObject numberLabel = CreateTMP("NumberText", rowTemplate.transform, "1", 14, FontStyles.Normal);
-        numberLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+        // Leading spacer so column 1's header sits above column 1's cells, not above the row labels.
+        GameObject headerSpacer = new GameObject("HeaderSpacer", typeof(RectTransform), typeof(LayoutElement));
+        headerSpacer.transform.SetParent(headerRow.transform, false);
+        headerSpacer.GetComponent<LayoutElement>().preferredWidth = RowLabelWidth;
 
-        // InstructionContainer: empty horizontal strip. Runtime code appends instruction token
-        // prefabs here left-to-right (hex icon, arrow icon, hex icon, comma...) as the player commits instructions.
+        // --- HeaderCellTemplate: disabled stamp, duplicated per column into ColumnHeaderRow. ---
+        GameObject headerCellTemplate = new GameObject("HeaderCellTemplate", typeof(RectTransform), typeof(LayoutElement));
+        headerCellTemplate.transform.SetParent(gridContent.transform, false);
+        LayoutElement headerCellLE = headerCellTemplate.GetComponent<LayoutElement>();
+        headerCellLE.preferredWidth = CellSize;
+        headerCellLE.preferredHeight = 24f;
+        GameObject headerNumberText = CreateTMP("NumberText", headerCellTemplate.transform, "1", 14, FontStyles.Normal);
+        TextMeshProUGUI headerTMP = headerNumberText.GetComponent<TextMeshProUGUI>();
+        headerTMP.alignment = TextAlignmentOptions.Center;
+        RectTransform headerNumberRT = headerNumberText.GetComponent<RectTransform>();
+        headerNumberRT.anchorMin = Vector2.zero;
+        headerNumberRT.anchorMax = Vector2.one;
+        headerNumberRT.offsetMin = Vector2.zero;
+        headerNumberRT.offsetMax = Vector2.zero;
+        headerCellTemplate.SetActive(false);
+
+        // --- ProcessorRowTemplate: disabled stamp, duplicated per processor. Contains only the
+        // row label + empty HorizontalLayoutGroup — cells are appended into it separately at
+        // runtime (one CellTemplate copy per column), since column count varies per row/puzzle-state.
+        GameObject rowTemplate = new GameObject("ProcessorRowTemplate", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+        rowTemplate.transform.SetParent(gridContent.transform, false);
+        HorizontalLayoutGroup rowHLG = rowTemplate.GetComponent<HorizontalLayoutGroup>();
+        rowHLG.childAlignment = TextAnchor.MiddleLeft;
+        rowHLG.childForceExpandWidth = false;
+        rowHLG.childForceExpandHeight = false;
+        rowHLG.childControlWidth = false;
+        rowHLG.childControlHeight = false;
+        rowHLG.spacing = 2f;
+        rowTemplate.GetComponent<LayoutElement>().preferredHeight = CellSize;
+
+        GameObject rowLabel = CreateTMP("RowLabel", rowTemplate.transform, "P1", 14, FontStyles.Normal);
+        LayoutElement rowLabelLE = rowLabel.GetComponent<LayoutElement>();
+        rowLabelLE.preferredWidth = RowLabelWidth;
+        rowLabelLE.preferredHeight = CellSize;
+
+        rowTemplate.SetActive(false);
+
+        // --- CellTemplate: disabled stamp, duplicated into a ProcessorRowTemplate copy for every
+        // (processor, column) pair that needs one. Holds at most ONE instruction, rendered as a
+        // token sequence (e.g. [square "4"][arrow][empty square]) inside InstructionContainer.
+        GameObject cellTemplate = new GameObject("CellTemplate", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+        cellTemplate.transform.SetParent(gridContent.transform, false);
+        Image cellImage = cellTemplate.GetComponent<Image>();
+        cellImage.color = Color.white;
+        Button cellButton = cellTemplate.GetComponent<Button>();
+        cellButton.targetGraphic = cellImage;
+        LayoutElement cellLE = cellTemplate.GetComponent<LayoutElement>();
+        cellLE.preferredWidth = CellSize;
+        cellLE.preferredHeight = CellSize;
+
+        // Empty — runtime code appends instruction token prefabs here (subject icon / arrow /
+        // destination icon) once the player commits an instruction into this cell.
         GameObject instructionContainer = new GameObject("InstructionContainer", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-        instructionContainer.transform.SetParent(rowTemplate.transform, false);
+        instructionContainer.transform.SetParent(cellTemplate.transform, false);
         HorizontalLayoutGroup instrHLG = instructionContainer.GetComponent<HorizontalLayoutGroup>();
-        instrHLG.childAlignment = TextAnchor.MiddleLeft;
+        instrHLG.childAlignment = TextAnchor.MiddleCenter;
         instrHLG.childForceExpandWidth = false;
         instrHLG.childForceExpandHeight = false;
         instrHLG.childControlWidth = false;
         instrHLG.childControlHeight = false;
-        instrHLG.spacing = 4f;
-        instructionContainer.GetComponent<LayoutElement>().preferredHeight = 20f;
+        instrHLG.spacing = 2f;
+        RectTransform instrRT = instructionContainer.GetComponent<RectTransform>();
+        instrRT.anchorMin = Vector2.zero;
+        instrRT.anchorMax = Vector2.one;
+        instrRT.offsetMin = Vector2.zero;
+        instrRT.offsetMax = Vector2.zero;
 
-        // Bottom divider line under each row, matching the reference image's horizontal rules.
-        GameObject rowLine = new GameObject("LineImage", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-        rowLine.transform.SetParent(rowTemplate.transform, false);
-        rowLine.GetComponent<Image>().color = Color.black;
-        rowLine.GetComponent<LayoutElement>().preferredHeight = 2f;
+        // Right-edge divider, standing in for the dashed column rule in the reference image.
+        // Solid for now — swap for a dashed sprite/texture later if you want the exact look.
+        GameObject cellRightBorder = new GameObject("RightBorder", typeof(RectTransform), typeof(Image));
+        cellRightBorder.transform.SetParent(cellTemplate.transform, false);
+        cellRightBorder.GetComponent<Image>().color = Color.black;
+        RectTransform borderRT = cellRightBorder.GetComponent<RectTransform>();
+        borderRT.anchorMin = new Vector2(1f, 0f);
+        borderRT.anchorMax = new Vector2(1f, 1f);
+        borderRT.pivot = new Vector2(1f, 0.5f);
+        borderRT.sizeDelta = new Vector2(2f, 0f);
+        borderRT.anchoredPosition = Vector2.zero;
 
-        // Template is inactive — it's a stamp, not a visible row. Runtime code enables its Instantiate()'d copies.
-        rowTemplate.SetActive(false);
+        cellTemplate.SetActive(false);
+
+        // --- SquareTokenTemplate: disabled stamp, duplicated per instruction operand.
+        // Small white square + number, carries a HexCoord for hover-highlighting the 3D tile.
+        GameObject squareTokenTemplate = new GameObject("SquareTokenTemplate", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+        squareTokenTemplate.transform.SetParent(gridContent.transform, false);
+        squareTokenTemplate.GetComponent<Image>().color = Color.white;
+        LayoutElement squareTokenLE = squareTokenTemplate.GetComponent<LayoutElement>();
+        squareTokenLE.preferredWidth = 18f;
+        squareTokenLE.preferredHeight = 18f;
+        GameObject squareTokenText = CreateTMP("NumberText", squareTokenTemplate.transform, "0", 11, FontStyles.Bold);
+        TextMeshProUGUI squareTokenTMP = squareTokenText.GetComponent<TextMeshProUGUI>();
+        squareTokenTMP.alignment = TextAlignmentOptions.Center;
+        RectTransform squareTokenTextRT = squareTokenText.GetComponent<RectTransform>();
+        squareTokenTextRT.anchorMin = Vector2.zero;
+        squareTokenTextRT.anchorMax = Vector2.one;
+        squareTokenTextRT.offsetMin = Vector2.zero;
+        squareTokenTextRT.offsetMax = Vector2.zero;
+        InstructionToken squareTokenComponent = squareTokenTemplate.AddComponent<InstructionToken>();
+        SerializedObject tokenSO = new SerializedObject(squareTokenComponent);
+        tokenSO.FindProperty("label").objectReferenceValue = squareTokenTMP;
+        tokenSO.ApplyModifiedProperties();
+        squareTokenTemplate.SetActive(false);
+
+        // --- ArrowTokenTemplate: disabled stamp, decorative "move" arrow between squares. ---
+        GameObject arrowTokenTemplate = new GameObject("ArrowTokenTemplate", typeof(RectTransform), typeof(LayoutElement));
+        arrowTokenTemplate.transform.SetParent(gridContent.transform, false);
+        LayoutElement arrowTokenLE = arrowTokenTemplate.GetComponent<LayoutElement>();
+        arrowTokenLE.preferredWidth = 18f;
+        arrowTokenLE.preferredHeight = 18f;
+        GameObject arrowTokenText = CreateTMP("ArrowText", arrowTokenTemplate.transform, "\u2192", 14, FontStyles.Normal);
+        TextMeshProUGUI arrowTokenTMP = arrowTokenText.GetComponent<TextMeshProUGUI>();
+        arrowTokenTMP.alignment = TextAlignmentOptions.Center;
+        RectTransform arrowTokenTextRT = arrowTokenText.GetComponent<RectTransform>();
+        arrowTokenTextRT.anchorMin = Vector2.zero;
+        arrowTokenTextRT.anchorMax = Vector2.one;
+        arrowTokenTextRT.offsetMin = Vector2.zero;
+        arrowTokenTextRT.offsetMax = Vector2.zero;
+        arrowTokenTemplate.SetActive(false);
+
+        // --- Runtime controllers, wired entirely in code (Inspector wiring doesn't survive Instantiate). ---
+        HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
+        if (selector != null)
+        {
+            SerializedObject selectorSO = new SerializedObject(selector);
+            if (selectorSO.FindProperty("hexGridSpawner").objectReferenceValue == null)
+            {
+                selectorSO.FindProperty("hexGridSpawner").objectReferenceValue = Object.FindFirstObjectByType<HexGridSpawner>();
+                selectorSO.ApplyModifiedProperties();
+            }
+        }
+
+        GridController gridController = infoTab.AddComponent<GridController>();
+        SerializedObject gridSO = new SerializedObject(gridController);
+        gridSO.FindProperty("labelController").objectReferenceValue = Object.FindFirstObjectByType<HexTileLabelController>();
+        gridSO.FindProperty("tileSelector").objectReferenceValue = selector;
+        gridSO.FindProperty("gridContent").objectReferenceValue = gridContentRT;
+        gridSO.FindProperty("columnHeaderRow").objectReferenceValue = headerRow.GetComponent<RectTransform>();
+        gridSO.FindProperty("processorRowTemplate").objectReferenceValue = rowTemplate;
+        gridSO.FindProperty("cellTemplate").objectReferenceValue = cellTemplate;
+        gridSO.FindProperty("headerCellTemplate").objectReferenceValue = headerCellTemplate;
+        gridSO.FindProperty("squareTokenTemplate").objectReferenceValue = squareTokenTemplate;
+        gridSO.FindProperty("arrowTokenTemplate").objectReferenceValue = arrowTokenTemplate;
+        gridSO.ApplyModifiedProperties();
+
+        InstructionAuthoringController authoring = infoTab.AddComponent<InstructionAuthoringController>();
+        SerializedObject authoringSO = new SerializedObject(authoring);
+        authoringSO.FindProperty("gridController").objectReferenceValue = gridController;
+        authoringSO.FindProperty("labelController").objectReferenceValue = Object.FindFirstObjectByType<HexTileLabelController>();
+        authoringSO.FindProperty("tileSelector").objectReferenceValue = selector;
+        authoringSO.ApplyModifiedProperties();
 
         Selection.activeGameObject = infoTab;
-        Debug.Log("InfoTab built successfully. CycleRowTemplate is under RightPanel > Viewport > Content, disabled — duplicate it at runtime per cycle.");
-    }
-
-    private static GameObject CreateVerticalGroup(string name, Transform parent, TextAnchor alignment, float spacing)
-    {
-        GameObject go = new GameObject(name, typeof(RectTransform), typeof(VerticalLayoutGroup));
-        go.transform.SetParent(parent, false);
-        VerticalLayoutGroup vlg = go.GetComponent<VerticalLayoutGroup>();
-        vlg.childAlignment = alignment;
-        vlg.spacing = spacing;
-        vlg.childForceExpandWidth = true;
-        vlg.childForceExpandHeight = false;
-        vlg.childControlWidth = true;
-        vlg.childControlHeight = true;
-        return go;
+        Debug.Log("InfoTab built successfully. GridPanel fills the entire tab. GridContent holds " +
+                   "ColumnHeaderRow (active) plus HeaderCellTemplate / ProcessorRowTemplate / CellTemplate / " +
+                   "SquareTokenTemplate / ArrowTokenTemplate (all disabled stamps) — instantiate these at runtime to grow the grid. " +
+                   "GridController + InstructionAuthoringController attached to InfoTab with references wired.");
     }
 
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)

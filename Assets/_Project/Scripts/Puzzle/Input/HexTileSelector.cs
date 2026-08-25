@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class HexTileSelector : MonoBehaviour
 {
@@ -6,11 +7,15 @@ public class HexTileSelector : MonoBehaviour
     [SerializeField] private Color highlightColor = Color.yellow;
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private HexTileLabelController labelController;
+    [SerializeField] private HexGridSpawner hexGridSpawner;
+
+    public event System.Action<HexCoord> OnTileClicked;
 
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
     private MaterialPropertyBlock propertyBlock;
     private MeshRenderer hoveredRenderer;
+    private bool uiHighlightActive;
 
     private void Awake()
     {
@@ -19,12 +24,20 @@ public class HexTileSelector : MonoBehaviour
 
     private void Update()
     {
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+        {
+            if (!uiHighlightActive) ClearHover();
+            return;
+        }
+
         UpdateHover();
         CheckForClick();
     }
 
     private void UpdateHover()
     {
+        if (uiHighlightActive) return;
+
         Ray ray = targetCamera.ScreenPointToRay(Input.mousePosition);
 
         if (Physics.Raycast(ray, out RaycastHit hit))
@@ -65,9 +78,10 @@ public class HexTileSelector : MonoBehaviour
 
         if (Input.GetMouseButtonDown(0))
         {
-            string tileToPlace = inventoryUI.CurrentSelectedTile;
+            if (identity == null) return;
 
-            if (identity != null && !string.IsNullOrEmpty(tileToPlace))
+            string tileToPlace = inventoryUI.CurrentSelectedTile;
+            if (!string.IsNullOrEmpty(tileToPlace))
             {
                 TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
                 if (tileData != null)
@@ -75,7 +89,30 @@ public class HexTileSelector : MonoBehaviour
                     labelController.boardState.PlaceTile(identity.coordinate, tileData);
                 }
             }
+            else
+            {
+                OnTileClicked?.Invoke(identity.coordinate);
+            }
         }
+    }
+
+    public void HighlightTile(HexCoord coord)
+    {
+        if (hexGridSpawner == null) return;
+        if (!hexGridSpawner.SpawnedTiles.TryGetValue(coord, out GameObject hexTile)) return;
+
+        MeshRenderer renderer = hexTile.GetComponentInChildren<MeshRenderer>();
+        if (renderer == null) return;
+
+        if (renderer != hoveredRenderer) ClearHover();
+        SetHover(renderer);
+        uiHighlightActive = true;
+    }
+
+    public void ClearTileHighlight()
+    {
+        uiHighlightActive = false;
+        ClearHover();
     }
 
     private void SetHover(MeshRenderer renderer)

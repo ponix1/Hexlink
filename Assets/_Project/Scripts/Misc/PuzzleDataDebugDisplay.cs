@@ -17,8 +17,8 @@ public class PuzzleDataDebugDisplay : MonoBehaviour
         style.fontSize = 12;
         style.normal.textColor = Color.white;
 
-        float boxX = Margin;
-        float boxY = Screen.height - BoxHeight - Margin;
+        float boxX = Screen.width - BoxWidth - Margin;
+        float boxY = Margin;
 
         GUI.Box(new Rect(boxX, boxY, BoxWidth, BoxHeight), "");
 
