@@ -45,7 +45,7 @@ public class FinalTileData : TileData
 
     public override string GetDisplayValue()
     {
-        return "Target: " + targetNumber;
+        return "_";
     }
 }
 

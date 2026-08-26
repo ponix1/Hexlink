@@ -7,6 +7,7 @@ public class HexTileLabelController : MonoBehaviour
     [SerializeField] private HexGridSpawner hexGridSpawner;
     [SerializeField] private GameObject tileLabelPrefab;
     [SerializeField] private Color operationColor = new Color(0.635f, 0.843f, 0.890f); // A2D7E3
+    [SerializeField] private Color finalTileColor = new Color(0.522f, 0.522f, 0.522f); // 858585
 
     public BoardState boardState = new BoardState();
 
@@ -61,13 +62,17 @@ public class HexTileLabelController : MonoBehaviour
 
         if (tile is OperationTileData)
         {
-            ApplyOperationColor(placedTile);
+            ApplyTileColor(placedTile, operationColor);
+        }
+        else if (tile is FinalTileData)
+        {
+            ApplyTileColor(placedTile, finalTileColor);
         }
 
         activeLabels[coord] = placedTile;
     }
 
-    private void ApplyOperationColor(GameObject placedTile)
+    private void ApplyTileColor(GameObject placedTile, Color color)
     {
         foreach (MeshRenderer renderer in placedTile.GetComponentsInChildren<MeshRenderer>())
         {
@@ -77,7 +82,7 @@ public class HexTileLabelController : MonoBehaviour
             }
 
             renderer.GetPropertyBlock(colorBlock);
-            colorBlock.SetColor(BaseColorID, operationColor);
+            colorBlock.SetColor(BaseColorID, color);
             renderer.SetPropertyBlock(colorBlock);
         }
     }

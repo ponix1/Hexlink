@@ -19,10 +19,22 @@ MonoBehaviour:
       q: 0
       r: 0
   - coordinate:
+      q: 1
+      r: 0
+  - coordinate:
+      q: 1
+      r: -1
+  - coordinate:
       q: 0
-      r: 1
+      r: -1
   - coordinate:
       q: -1
+      r: 0
+  - coordinate:
+      q: -1
+      r: 1
+  - coordinate:
+      q: 0
       r: 1
   targetScore: 123
   availableNumbers: 010000000200000003000000

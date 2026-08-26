@@ -10,6 +10,11 @@ public class MoveInstructionData : InstructionData
     public HexCoord Destination;
 }
 
+public class SelectInstructionData : InstructionData
+{
+    public HexCoord Source;
+}
+
 public class OperationInstructionData : InstructionData
 {
     public HexCoord Source;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
@@ -7,6 +8,7 @@ public class GridController : MonoBehaviour
 {
     [SerializeField] private HexTileLabelController labelController;
     [SerializeField] private HexTileSelector tileSelector;
+    [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private RectTransform gridContent;
     [SerializeField] private RectTransform columnHeaderRow;
     [SerializeField] private GameObject processorRowTemplate;
@@ -84,11 +86,34 @@ public class GridController : MonoBehaviour
             InstructionContainer = cellObj.transform.Find("InstructionContainer") as RectTransform
         };
         cellObj.GetComponent<Button>().onClick.AddListener(() => SelectCell(processorIndex, columnIndex));
+
+        CellClickHandler clickHandler = cellObj.AddComponent<CellClickHandler>();
+        clickHandler.OnClick = eventData =>
+        {
+            if (eventData.button == PointerEventData.InputButton.Middle)
+            {
+                ClearCell(processorIndex, columnIndex);
+            }
+        };
         return cell;
+    }
+
+    public void ClearCell(int processorIndex, int columnIndex)
+    {
+        Cell cell = GetCell(processorIndex, columnIndex);
+        if (cell == null) return;
+
+        foreach (Transform token in cell.InstructionContainer)
+        {
+            Destroy(token.gameObject);
+        }
+        cell.Instruction = null;
     }
 
     public void SelectCell(int processorIndex, int columnIndex)
     {
+        if (inventoryUI != null) inventoryUI.DeselectTile();
+
         Cell previous = GetCell(SelectedProcessor, SelectedColumn);
         if (previous != null) previous.Image.color = Color.white;
 
@@ -120,11 +145,7 @@ public class GridController : MonoBehaviour
         {
             for (int c = 0; c < rows[p].Cells.Count; c++)
             {
-                foreach (Transform token in rows[p].Cells[c].InstructionContainer)
-                {
-                    Destroy(token.gameObject);
-                }
-                rows[p].Cells[c].Instruction = null;
+                ClearCell(p, c);
             }
         }
         SelectCell(0, 0);
@@ -140,19 +161,26 @@ public class GridController : MonoBehaviour
             SpawnArrowToken(container);
             SpawnSquareToken(container, move.Destination);
         }
+        else if (instruction is SelectInstructionData select)
+        {
+            SpawnSquareToken(container, select.Source, "{{{0}}}");
+        }
         else if (instruction is OperationInstructionData op)
         {
             SpawnSquareToken(container, op.Source);
-            SpawnSquareToken(container, op.OperationTile);
+            if (op.AdditionalOperands.Count == 0)
+            {
+                SpawnSquareToken(container, op.OperationTile);
+            }
             for (int i = 0; i < op.AdditionalOperands.Count; i++)
             {
-                SpawnSquareToken(container, op.AdditionalOperands[i]);
                 SpawnSquareToken(container, op.OperationTile);
+                SpawnSquareToken(container, op.AdditionalOperands[i]);
             }
         }
     }
 
-    private void SpawnSquareToken(Transform container, HexCoord coord)
+    private void SpawnSquareToken(Transform container, HexCoord coord, string format = "{0}")
     {
         GameObject token = Instantiate(squareTokenTemplate, container);
         token.SetActive(true);
@@ -161,7 +189,7 @@ public class GridController : MonoBehaviour
         instructionToken.Setup(tileSelector, coord);
 
         TileData tile = labelController.boardState.GetTile(coord);
-        instructionToken.SetText(tile != null ? tile.GetDisplayValue() : "");
+        instructionToken.SetText(tile != null ? string.Format(format, tile.GetDisplayValue()) : "");
     }
 
     private void SpawnArrowToken(Transform container)
@@ -175,5 +203,15 @@ public class GridController : MonoBehaviour
         if (processorIndex < 0 || processorIndex >= rows.Count) return null;
         if (columnIndex < 0 || columnIndex >= rows[processorIndex].Cells.Count) return null;
         return rows[processorIndex].Cells[columnIndex];
+    }
+}
+
+public class CellClickHandler : MonoBehaviour, IPointerClickHandler
+{
+    public System.Action<PointerEventData> OnClick;
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        OnClick?.Invoke(eventData);
     }
 }

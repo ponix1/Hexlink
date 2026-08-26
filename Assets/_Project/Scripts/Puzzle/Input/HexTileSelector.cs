@@ -8,6 +8,7 @@ public class HexTileSelector : MonoBehaviour
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private HexTileLabelController labelController;
     [SerializeField] private HexGridSpawner hexGridSpawner;
+    [SerializeField] private InstructionAuthoringController authoringController;
 
     public event System.Action<HexCoord> OnTileClicked;
 
@@ -80,8 +81,9 @@ public class HexTileSelector : MonoBehaviour
         {
             if (identity == null) return;
 
-            string tileToPlace = inventoryUI.CurrentSelectedTile;
-            if (!string.IsNullOrEmpty(tileToPlace))
+            bool authoringBusy = authoringController != null && authoringController.IsBusy;
+            string tileToPlace = inventoryUI != null ? inventoryUI.CurrentSelectedTile : "";
+            if (!authoringBusy && !string.IsNullOrEmpty(tileToPlace))
             {
                 TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
                 if (tileData != null)

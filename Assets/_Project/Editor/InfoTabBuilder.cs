@@ -77,8 +77,8 @@ public class InfoTabBuilder
         gridVLG.childAlignment = TextAnchor.UpperLeft;
         gridVLG.childForceExpandWidth = false;
         gridVLG.childForceExpandHeight = false;
-        gridVLG.childControlWidth = false;
-        gridVLG.childControlHeight = false;
+        gridVLG.childControlWidth = true;
+        gridVLG.childControlHeight = true;
         gridVLG.spacing = 2f;
 
         ContentSizeFitter gridCSF = gridContent.GetComponent<ContentSizeFitter>();
@@ -101,8 +101,8 @@ public class InfoTabBuilder
         headerHLG.childAlignment = TextAnchor.MiddleLeft;
         headerHLG.childForceExpandWidth = false;
         headerHLG.childForceExpandHeight = false;
-        headerHLG.childControlWidth = false;
-        headerHLG.childControlHeight = false;
+        headerHLG.childControlWidth = true;
+        headerHLG.childControlHeight = true;
         headerHLG.spacing = 2f;
         headerRow.GetComponent<LayoutElement>().preferredHeight = 24f;
 
@@ -136,8 +136,8 @@ public class InfoTabBuilder
         rowHLG.childAlignment = TextAnchor.MiddleLeft;
         rowHLG.childForceExpandWidth = false;
         rowHLG.childForceExpandHeight = false;
-        rowHLG.childControlWidth = false;
-        rowHLG.childControlHeight = false;
+        rowHLG.childControlWidth = true;
+        rowHLG.childControlHeight = true;
         rowHLG.spacing = 2f;
         rowTemplate.GetComponent<LayoutElement>().preferredHeight = CellSize;
 
@@ -169,8 +169,8 @@ public class InfoTabBuilder
         instrHLG.childAlignment = TextAnchor.MiddleCenter;
         instrHLG.childForceExpandWidth = false;
         instrHLG.childForceExpandHeight = false;
-        instrHLG.childControlWidth = false;
-        instrHLG.childControlHeight = false;
+        instrHLG.childControlWidth = true;
+        instrHLG.childControlHeight = true;
         instrHLG.spacing = 2f;
         RectTransform instrRT = instructionContainer.GetComponent<RectTransform>();
         instrRT.anchorMin = Vector2.zero;
@@ -246,6 +246,7 @@ public class InfoTabBuilder
         SerializedObject gridSO = new SerializedObject(gridController);
         gridSO.FindProperty("labelController").objectReferenceValue = Object.FindFirstObjectByType<HexTileLabelController>();
         gridSO.FindProperty("tileSelector").objectReferenceValue = selector;
+        gridSO.FindProperty("inventoryUI").objectReferenceValue = Object.FindFirstObjectByType<TileInventoryUI>();
         gridSO.FindProperty("gridContent").objectReferenceValue = gridContentRT;
         gridSO.FindProperty("columnHeaderRow").objectReferenceValue = headerRow.GetComponent<RectTransform>();
         gridSO.FindProperty("processorRowTemplate").objectReferenceValue = rowTemplate;
@@ -261,6 +262,13 @@ public class InfoTabBuilder
         authoringSO.FindProperty("labelController").objectReferenceValue = Object.FindFirstObjectByType<HexTileLabelController>();
         authoringSO.FindProperty("tileSelector").objectReferenceValue = selector;
         authoringSO.ApplyModifiedProperties();
+
+        if (selector != null)
+        {
+            SerializedObject selectorSO2 = new SerializedObject(selector);
+            selectorSO2.FindProperty("authoringController").objectReferenceValue = authoring;
+            selectorSO2.ApplyModifiedProperties();
+        }
 
         Selection.activeGameObject = infoTab;
         Debug.Log("InfoTab built successfully. GridPanel fills the entire tab. GridContent holds " +
