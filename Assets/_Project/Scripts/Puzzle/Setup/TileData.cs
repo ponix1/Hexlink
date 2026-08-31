@@ -20,7 +20,7 @@ public class NumberTileData : TileData
 [System.Serializable]
 public class OperationTileData : TileData
 {
-    public enum OperationType { Add, Subtract, Multiply, Divide, Power, Factorial }
+    public enum OperationType { Add, Subtract, Multiply, Divide, Power, Factorial, SquareRoot }
     public OperationType operation;
 
     public override string GetDisplayValue()
@@ -29,10 +29,11 @@ public class OperationTileData : TileData
         {
             case OperationType.Add: return "+";
             case OperationType.Subtract: return "-";
-            case OperationType.Multiply: return "×";
-            case OperationType.Divide: return "÷";
+            case OperationType.Multiply: return "\u00D7";
+            case OperationType.Divide: return "\u00F7";
             case OperationType.Power: return "^";
             case OperationType.Factorial: return "!";
+            case OperationType.SquareRoot: return "\u221A";
             default: return "?";
         }
     }
@@ -68,6 +69,7 @@ public static class TileDataFactory
             case "/": return new OperationTileData { operation = OperationTileData.OperationType.Divide };
             case "^": return new OperationTileData { operation = OperationTileData.OperationType.Power };
             case "!": return new OperationTileData { operation = OperationTileData.OperationType.Factorial };
+            case "\u221A": return new OperationTileData { operation = OperationTileData.OperationType.SquareRoot };
         }
 
         // Final tile (target number defaults to 0 for now - revisit later)

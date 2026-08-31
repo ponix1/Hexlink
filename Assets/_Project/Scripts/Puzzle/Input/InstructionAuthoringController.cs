@@ -18,6 +18,15 @@ public class InstructionAuthoringController : MonoBehaviour
 
     public bool IsBusy => state != State.Idle;
 
+    public void CancelPending()
+    {
+        if (state != State.Idle)
+        {
+            Reset();
+            Debug.Log("Instruction cancelled — palette selection takes priority.");
+        }
+    }
+
     private void OnEnable()
     {
         tileSelector.OnTileClicked += HandleTileClicked;
@@ -74,10 +83,12 @@ public class InstructionAuthoringController : MonoBehaviour
         switch (state)
         {
             case State.Idle:
+            case State.SubjectSelected:
                 subject = coord;
                 operands.Clear();
                 hasMoveTarget = false;
                 state = State.SubjectSelected;
+                Debug.Log($"Subject set: {coord.q},{coord.r}. Press Z (move), C (operation) or Space (select).");
                 break;
 
             case State.AwaitingMoveTarget:
@@ -140,7 +151,9 @@ public class InstructionAuthoringController : MonoBehaviour
             OperationTileData opData = labelController.boardState.GetTile(operationTile) as OperationTileData;
             if (opData == null) return;
 
-            if (opData.operation != OperationTileData.OperationType.Factorial && operands.Count == 0)
+            bool unary = opData.operation == OperationTileData.OperationType.Factorial
+                      || opData.operation == OperationTileData.OperationType.SquareRoot;
+            if (!unary && operands.Count == 0)
             {
                 Debug.Log($"{opData.GetDisplayValue()} needs at least one operand tile. Click one adjacent to the operation tile, or press Escape to cancel.");
                 return;

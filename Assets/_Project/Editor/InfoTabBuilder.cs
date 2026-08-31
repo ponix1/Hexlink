@@ -19,15 +19,37 @@ public class InfoTabBuilder
             return;
         }
 
+        CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
+        if (scaler != null && scaler.uiScaleMode == CanvasScaler.ScaleMode.ConstantPixelSize)
+        {
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
+            EditorUtility.SetDirty(scaler);
+        }
+
+        // Preserve the user's current InfoTab placement across rebuilds.
+        RectTransform previousTab = canvas.transform.Find("InfoTab") as RectTransform;
+        Vector2 savedAnchorMin = previousTab != null ? previousTab.anchorMin : new Vector2(0f, 0f);
+        Vector2 savedAnchorMax = previousTab != null ? previousTab.anchorMax : new Vector2(1f, 0f);
+        Vector2 savedPivot = previousTab != null ? previousTab.pivot : new Vector2(0.5f, 0f);
+        Vector2 savedPosition = previousTab != null ? previousTab.anchoredPosition : Vector2.zero;
+        Vector2 savedSize = previousTab != null ? previousTab.sizeDelta : new Vector2(0f, 220f);
+        if (previousTab != null)
+        {
+            Object.DestroyImmediate(previousTab.gameObject);
+        }
+
         // --- InfoTab (black border layer) ---
         GameObject infoTab = new GameObject("InfoTab", typeof(RectTransform), typeof(Image));
         infoTab.transform.SetParent(canvas.transform, false);
         RectTransform infoTabRT = infoTab.GetComponent<RectTransform>();
-        infoTabRT.anchorMin = new Vector2(0f, 0f);
-        infoTabRT.anchorMax = new Vector2(1f, 0f);
-        infoTabRT.pivot = new Vector2(0.5f, 0f);
-        infoTabRT.sizeDelta = new Vector2(0f, 220f);
-        infoTabRT.anchoredPosition = Vector2.zero;
+        infoTabRT.anchorMin = savedAnchorMin;
+        infoTabRT.anchorMax = savedAnchorMax;
+        infoTabRT.pivot = savedPivot;
+        infoTabRT.anchoredPosition = savedPosition;
+        infoTabRT.sizeDelta = savedSize;
         infoTab.GetComponent<Image>().color = Color.black;
 
         // --- Content (white inset layer) ---
@@ -230,6 +252,28 @@ public class InfoTabBuilder
         arrowTokenTextRT.offsetMax = Vector2.zero;
         arrowTokenTemplate.SetActive(false);
 
+        // --- CollapseButton: toggles the InfoTab between full height and a slim strip. ---
+        GameObject collapseButton = new GameObject("CollapseButton", typeof(RectTransform), typeof(Image), typeof(Button));
+        collapseButton.transform.SetParent(infoTab.transform, false);
+        Image collapseImage = collapseButton.GetComponent<Image>();
+        collapseImage.color = Color.white;
+        Button collapseBtn = collapseButton.GetComponent<Button>();
+        collapseBtn.targetGraphic = collapseImage;
+        RectTransform collapseRT = collapseButton.GetComponent<RectTransform>();
+        collapseRT.anchorMin = new Vector2(0f, 1f);
+        collapseRT.anchorMax = new Vector2(0f, 1f);
+        collapseRT.pivot = new Vector2(0f, 1f);
+        collapseRT.anchoredPosition = new Vector2(6f, 24f);
+        collapseRT.sizeDelta = new Vector2(90f, 22f);
+        GameObject collapseText = CreateTMP("Label", collapseButton.transform, "Hide", 13, FontStyles.Bold);
+        TextMeshProUGUI collapseTMP = collapseText.GetComponent<TextMeshProUGUI>();
+        collapseTMP.alignment = TextAlignmentOptions.Center;
+        RectTransform collapseTextRT = collapseText.GetComponent<RectTransform>();
+        collapseTextRT.anchorMin = Vector2.zero;
+        collapseTextRT.anchorMax = Vector2.one;
+        collapseTextRT.offsetMin = Vector2.zero;
+        collapseTextRT.offsetMax = Vector2.zero;
+
         // --- Runtime controllers, wired entirely in code (Inspector wiring doesn't survive Instantiate). ---
         HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
         if (selector != null)
@@ -254,6 +298,7 @@ public class InfoTabBuilder
         gridSO.FindProperty("headerCellTemplate").objectReferenceValue = headerCellTemplate;
         gridSO.FindProperty("squareTokenTemplate").objectReferenceValue = squareTokenTemplate;
         gridSO.FindProperty("arrowTokenTemplate").objectReferenceValue = arrowTokenTemplate;
+        gridSO.FindProperty("collapseButton").objectReferenceValue = collapseButton;
         gridSO.ApplyModifiedProperties();
 
         InstructionAuthoringController authoring = infoTab.AddComponent<InstructionAuthoringController>();

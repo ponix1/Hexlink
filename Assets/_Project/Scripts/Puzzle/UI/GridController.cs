@@ -16,7 +16,10 @@ public class GridController : MonoBehaviour
     [SerializeField] private GameObject headerCellTemplate;
     [SerializeField] private GameObject squareTokenTemplate;
     [SerializeField] private GameObject arrowTokenTemplate;
+    [SerializeField] private Button collapseButton;
     [SerializeField] private Color selectedColor = new Color(0.635f, 0.843f, 0.890f);
+
+    private const float CollapsedHeight = 30f;
 
     private class ProcessorRow
     {
@@ -33,15 +36,50 @@ public class GridController : MonoBehaviour
 
     private List<ProcessorRow> rows = new List<ProcessorRow>();
     private int columnCount;
+    private RectTransform tabRect;
+    private TextMeshProUGUI collapseLabel;
+    private bool collapsed;
+    private float expandedHeight;
+    private float targetHeight;
 
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
 
     private void Start()
     {
+        tabRect = (RectTransform)transform;
+        expandedHeight = tabRect.sizeDelta.y;
+        targetHeight = expandedHeight;
+
+        if (collapseButton != null)
+        {
+            collapseLabel = collapseButton.GetComponentInChildren<TextMeshProUGUI>();
+            collapseButton.onClick.AddListener(ToggleCollapsed);
+        }
+
         AddProcessorRow();
         AddColumn();
         SelectCell(0, 0);
+    }
+
+    private void Update()
+    {
+        if (tabRect != null && Mathf.Abs(tabRect.sizeDelta.y - targetHeight) > 0.1f)
+        {
+            Vector2 size = tabRect.sizeDelta;
+            size.y = Mathf.Lerp(size.y, targetHeight, 10f * Time.deltaTime);
+            tabRect.sizeDelta = size;
+        }
+    }
+
+    private void ToggleCollapsed()
+    {
+        collapsed = !collapsed;
+        targetHeight = collapsed ? CollapsedHeight : expandedHeight;
+        if (collapseLabel != null)
+        {
+            collapseLabel.text = collapsed ? "Show" : "Hide";
+        }
     }
 
     public void AddProcessorRow()
@@ -167,6 +205,12 @@ public class GridController : MonoBehaviour
         }
         else if (instruction is OperationInstructionData op)
         {
+            if (op.Operation == OperationTileData.OperationType.SquareRoot)
+            {
+                SpawnSquareRootToken(container, op.Source);
+                return;
+            }
+
             SpawnSquareToken(container, op.Source);
             if (op.AdditionalOperands.Count == 0)
             {
@@ -196,6 +240,50 @@ public class GridController : MonoBehaviour
     {
         GameObject token = Instantiate(arrowTokenTemplate, container);
         token.SetActive(true);
+    }
+
+    private void SpawnSquareRootToken(Transform container, HexCoord coord)
+    {
+        GameObject wrapper = new GameObject("SquareRootToken", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+        wrapper.transform.SetParent(container, false);
+        HorizontalLayoutGroup wrapperHLG = wrapper.GetComponent<HorizontalLayoutGroup>();
+        wrapperHLG.childAlignment = TextAnchor.MiddleLeft;
+        wrapperHLG.childForceExpandWidth = false;
+        wrapperHLG.childForceExpandHeight = false;
+        wrapperHLG.childControlWidth = true;
+        wrapperHLG.childControlHeight = true;
+        wrapperHLG.spacing = 0f;
+        LayoutElement wrapperLE = wrapper.AddComponent<LayoutElement>();
+        wrapperLE.preferredWidth = 30f;
+        wrapperLE.preferredHeight = 18f;
+
+        GameObject radical = new GameObject("RadicalSign", typeof(RectTransform), typeof(TextMeshProUGUI));
+        radical.transform.SetParent(wrapper.transform, false);
+        TextMeshProUGUI radicalTMP = radical.GetComponent<TextMeshProUGUI>();
+        radicalTMP.text = "\u221A";
+        radicalTMP.fontSize = 15;
+        radicalTMP.color = Color.black;
+        radicalTMP.alignment = TextAlignmentOptions.Center;
+        LayoutElement radicalLE = radical.AddComponent<LayoutElement>();
+        radicalLE.preferredWidth = 12f;
+        radicalLE.preferredHeight = 18f;
+
+        GameObject square = Instantiate(squareTokenTemplate, wrapper.transform);
+        square.SetActive(true);
+        InstructionToken instructionToken = square.GetComponent<InstructionToken>();
+        instructionToken.Setup(tileSelector, coord);
+        TileData tile = labelController.boardState.GetTile(coord);
+        instructionToken.SetText(tile != null ? tile.GetDisplayValue() : "");
+
+        GameObject overline = new GameObject("Overline", typeof(RectTransform), typeof(Image));
+        overline.transform.SetParent(square.transform, false);
+        overline.GetComponent<Image>().color = Color.black;
+        RectTransform overlineRT = overline.GetComponent<RectTransform>();
+        overlineRT.anchorMin = new Vector2(0f, 1f);
+        overlineRT.anchorMax = new Vector2(1f, 1f);
+        overlineRT.pivot = new Vector2(0.5f, 1f);
+        overlineRT.sizeDelta = new Vector2(0f, 1.5f);
+        overlineRT.anchoredPosition = Vector2.zero;
     }
 
     private Cell GetCell(int processorIndex, int columnIndex)

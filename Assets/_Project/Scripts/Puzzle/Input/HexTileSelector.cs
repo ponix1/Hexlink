@@ -23,8 +23,24 @@ public class HexTileSelector : MonoBehaviour
         propertyBlock = new MaterialPropertyBlock();
     }
 
+    private void Start()
+    {
+        // Keyboard-submit would re-trigger the last clicked UI button when the player
+        // presses Space/Enter for instruction authoring — disable navigation entirely.
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.sendNavigationEvents = false;
+        }
+    }
+
     private void Update()
     {
+        if (authoringController != null && authoringController.IsBusy
+            && inventoryUI != null && !string.IsNullOrEmpty(inventoryUI.CurrentSelectedTile))
+        {
+            authoringController.CancelPending();
+        }
+
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
         {
             if (!uiHighlightActive) ClearHover();
@@ -80,6 +96,7 @@ public class HexTileSelector : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             if (identity == null) return;
+            if (Input.GetMouseButton(1)) return;
 
             bool authoringBusy = authoringController != null && authoringController.IsBusy;
             string tileToPlace = inventoryUI != null ? inventoryUI.CurrentSelectedTile : "";

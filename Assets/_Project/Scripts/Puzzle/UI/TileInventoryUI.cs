@@ -14,7 +14,7 @@ public class TileInventoryUI : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1))
+        if (Input.GetKeyDown(KeyCode.Escape) || (Input.GetMouseButtonDown(1) && !Input.GetMouseButton(0)))
         {
             DeselectTile();
         }
