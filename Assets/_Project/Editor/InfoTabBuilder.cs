@@ -274,7 +274,9 @@ public class InfoTabBuilder
         collapseTextRT.offsetMin = Vector2.zero;
         collapseTextRT.offsetMax = Vector2.zero;
 
-        // --- Runtime controllers, wired entirely in code (Inspector wiring doesn't survive Instantiate). ---
+        // --- Play / Reset buttons, top-right above the tab (mirroring the Hide button). ---
+        GameObject playButton = CreateTabButton(infoTab.transform, "PlayButton", "Play", new Vector2(-6f, 24f));
+        GameObject resetButton = CreateTabButton(infoTab.transform, "ResetButton", "Reset", new Vector2(-102f, 24f));
         HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
         if (selector != null)
         {
@@ -315,11 +317,50 @@ public class InfoTabBuilder
             selectorSO2.ApplyModifiedProperties();
         }
 
+        ExecutionEngine engine = infoTab.AddComponent<ExecutionEngine>();
+        SerializedObject engineSO = new SerializedObject(engine);
+        engineSO.FindProperty("gridController").objectReferenceValue = gridController;
+        HexTileLabelController labelController = Object.FindFirstObjectByType<HexTileLabelController>();
+        engineSO.FindProperty("labelController").objectReferenceValue = labelController;
+        engineSO.FindProperty("hexGridSpawner").objectReferenceValue = Object.FindFirstObjectByType<HexGridSpawner>();
+        engineSO.FindProperty("playButton").objectReferenceValue = playButton.GetComponent<Button>();
+        engineSO.FindProperty("resetButton").objectReferenceValue = resetButton.GetComponent<Button>();
+        engineSO.FindProperty("nodePrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Node.prefab");
+        SerializedObject labelControllerSO = new SerializedObject(labelController);
+        engineSO.FindProperty("tileLabelPrefab").objectReferenceValue = labelControllerSO.FindProperty("tileLabelPrefab").objectReferenceValue;
+        engineSO.ApplyModifiedProperties();
+
         Selection.activeGameObject = infoTab;
         Debug.Log("InfoTab built successfully. GridPanel fills the entire tab. GridContent holds " +
                    "ColumnHeaderRow (active) plus HeaderCellTemplate / ProcessorRowTemplate / CellTemplate / " +
                    "SquareTokenTemplate / ArrowTokenTemplate (all disabled stamps) — instantiate these at runtime to grow the grid. " +
-                   "GridController + InstructionAuthoringController attached to InfoTab with references wired.");
+                   "GridController + InstructionAuthoringController + ExecutionEngine attached to InfoTab with references wired.");
+    }
+
+    private static GameObject CreateTabButton(Transform parent, string name, string label, Vector2 anchoredPosition)
+    {
+        GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        button.transform.SetParent(parent, false);
+        Image image = button.GetComponent<Image>();
+        image.color = Color.white;
+        Button buttonComponent = button.GetComponent<Button>();
+        buttonComponent.targetGraphic = image;
+        RectTransform rt = button.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(1f, 1f);
+        rt.anchoredPosition = anchoredPosition;
+        rt.sizeDelta = new Vector2(90f, 22f);
+
+        GameObject text = CreateTMP("Label", button.transform, label, 13, FontStyles.Bold);
+        TextMeshProUGUI tmp = text.GetComponent<TextMeshProUGUI>();
+        tmp.alignment = TextAlignmentOptions.Center;
+        RectTransform textRT = text.GetComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero;
+        textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = Vector2.zero;
+        textRT.offsetMax = Vector2.zero;
+        return button;
     }
 
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)

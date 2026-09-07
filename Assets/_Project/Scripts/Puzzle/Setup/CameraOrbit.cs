@@ -5,6 +5,7 @@ public class CameraOrbit : MonoBehaviour
     [SerializeField] private float rotationSpeed = 5f;
     [SerializeField] private float panSpeed = 0.002f;
     [SerializeField] private Vector3 boardCenter = Vector3.zero;
+    [SerializeField] private KeyCode recenterKey = KeyCode.F;
 
     private float currentHorizontalAngle;
     private float currentVerticalAngle;
@@ -24,7 +25,7 @@ public class CameraOrbit : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift))
+        if (Input.GetKeyDown(recenterKey))
         {
             Vector3 pos = transform.position;
             pos.x = boardCenter.x;

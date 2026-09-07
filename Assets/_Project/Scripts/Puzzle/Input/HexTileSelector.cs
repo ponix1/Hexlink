@@ -10,6 +10,10 @@ public class HexTileSelector : MonoBehaviour
     [SerializeField] private HexGridSpawner hexGridSpawner;
     [SerializeField] private InstructionAuthoringController authoringController;
 
+    // Reached through the authoring controller (already wired in existing scenes)
+    // so this logic never depends on a fresh InfoTab rebuild.
+    private GridController GridController => authoringController != null ? authoringController.GridController : null;
+
     public event System.Action<HexCoord> OnTileClicked;
 
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
@@ -77,6 +81,15 @@ public class HexTileSelector : MonoBehaviour
 
     private void CheckForClick()
     {
+        if (Input.GetMouseButtonDown(0) && hoveredRenderer == null)
+        {
+            if (authoringController != null)
+            {
+                authoringController.ExitInputMode();
+            }
+            return;
+        }
+
         if (hoveredRenderer == null)
         {
             return;
@@ -103,10 +116,28 @@ public class HexTileSelector : MonoBehaviour
             if (!authoringBusy && !string.IsNullOrEmpty(tileToPlace))
             {
                 TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
-                if (tileData != null)
+                if (tileData == null) return;
+
+                TileData existing = labelController.boardState.GetTile(identity.coordinate);
+                GridController grid = GridController;
+
+                if (existing != null && grid != null && grid.HasInstructionsReferencing(identity.coordinate))
                 {
-                    labelController.boardState.PlaceTile(identity.coordinate, tileData);
+                    if (grid.IsPendingChange(identity.coordinate))
+                    {
+                        grid.ClearPendingChange();
+                        Debug.Log("Change confirmed - instructions updated.");
+                        labelController.boardState.PlaceTile(identity.coordinate, tileData);
+                    }
+                    else
+                    {
+                        grid.SetPendingChange(identity.coordinate);
+                    }
+                    return;
                 }
+
+                if (grid != null) grid.ClearPendingChange();
+                labelController.boardState.PlaceTile(identity.coordinate, tileData);
             }
             else
             {

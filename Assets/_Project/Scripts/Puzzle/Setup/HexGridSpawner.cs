@@ -10,6 +10,7 @@ public class HexGridSpawner : MonoBehaviour
     private Dictionary<HexCoord, GameObject> spawnedTiles = new Dictionary<HexCoord, GameObject>();
 
     public IReadOnlyDictionary<HexCoord, GameObject> SpawnedTiles => spawnedTiles;
+    public GameObject HexTilePrefab => hexTilePrefab;
 
     private void Start()
     {

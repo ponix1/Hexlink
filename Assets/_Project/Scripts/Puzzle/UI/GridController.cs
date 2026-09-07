@@ -18,6 +18,17 @@ public class GridController : MonoBehaviour
     [SerializeField] private GameObject arrowTokenTemplate;
     [SerializeField] private Button collapseButton;
     [SerializeField] private Color selectedColor = new Color(0.635f, 0.843f, 0.890f);
+    [SerializeField] private Color errorColor = new Color(0.9f, 0.3f, 0.3f);
+    [SerializeField] private Color pendingChangeColor = Color.yellow;
+
+    private HexCoord? pendingChangeCoord;
+
+    public struct CellInstruction
+    {
+        public int Processor;
+        public int Column;
+        public InstructionData Instruction;
+    }
 
     private const float CollapsedHeight = 30f;
 
@@ -44,6 +55,45 @@ public class GridController : MonoBehaviour
 
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
+    public int ColumnCount => columnCount;
+
+    public List<CellInstruction> GetColumnInstructions(int columnIndex)
+    {
+        List<CellInstruction> result = new List<CellInstruction>();
+        for (int p = 0; p < rows.Count; p++)
+        {
+            if (columnIndex < rows[p].Cells.Count && rows[p].Cells[columnIndex].Instruction != null)
+            {
+                result.Add(new CellInstruction
+                {
+                    Processor = p,
+                    Column = columnIndex,
+                    Instruction = rows[p].Cells[columnIndex].Instruction
+                });
+            }
+        }
+        return result;
+    }
+
+    public void FlagError(int processorIndex, int columnIndex)
+    {
+        Cell cell = GetCell(processorIndex, columnIndex);
+        if (cell != null)
+        {
+            cell.Image.color = errorColor;
+        }
+    }
+
+    public void ClearErrors()
+    {
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                rows[p].Cells[c].Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : Color.white;
+            }
+        }
+    }
 
     private void Start()
     {
@@ -60,6 +110,120 @@ public class GridController : MonoBehaviour
         AddProcessorRow();
         AddColumn();
         SelectCell(0, 0);
+    }
+
+    private void OnEnable()
+    {
+        if (labelController != null)
+        {
+            labelController.boardState.OnCellChanged += HandleBoardCellChanged;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (labelController != null)
+        {
+            labelController.boardState.OnCellChanged -= HandleBoardCellChanged;
+        }
+    }
+
+    private void HandleBoardCellChanged(HexCoord coord)
+    {
+        TileData changedTile = labelController.boardState.GetTile(coord);
+
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                Cell cell = rows[p].Cells[c];
+                if (cell.Instruction == null || !ReferencesCoord(cell.Instruction, coord)) continue;
+
+                // Select/spawn instructions only track number tiles - never re-render them
+                // for an operation tile (you can't spawn an operation). Removals still clear them.
+                if (cell.Instruction is SelectInstructionData && changedTile != null && !(changedTile is NumberTileData)) continue;
+
+                foreach (Transform token in cell.InstructionContainer)
+                {
+                    Destroy(token.gameObject);
+                }
+                RenderInstruction(cell, cell.Instruction);
+            }
+        }
+    }
+
+    public bool HasInstructionsReferencing(HexCoord coord)
+    {
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                if (rows[p].Cells[c].Instruction != null && ReferencesCoord(rows[p].Cells[c].Instruction, coord))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public void SetPendingChange(HexCoord coord)
+    {
+        ClearPendingChange();
+        pendingChangeCoord = coord;
+
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                if (rows[p].Cells[c].Instruction != null && ReferencesCoord(rows[p].Cells[c].Instruction, coord))
+                {
+                    rows[p].Cells[c].Image.color = pendingChangeColor;
+                }
+            }
+        }
+
+        Debug.Log("This change affects existing instructions - click the tile again to confirm.");
+    }
+
+    public bool IsPendingChange(HexCoord coord)
+    {
+        return pendingChangeCoord.HasValue && pendingChangeCoord.Value.Equals(coord);
+    }
+
+    public void ClearPendingChange()
+    {
+        if (!pendingChangeCoord.HasValue) return;
+
+        HexCoord coord = pendingChangeCoord.Value;
+        pendingChangeCoord = null;
+
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                if (rows[p].Cells[c].Instruction != null && ReferencesCoord(rows[p].Cells[c].Instruction, coord))
+                {
+                    RestoreCellColor(rows[p].Cells[c], p, c);
+                }
+            }
+        }
+    }
+
+    private void RestoreCellColor(Cell cell, int p, int c)
+    {
+        cell.Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : Color.white;
+    }
+
+    private static bool ReferencesCoord(InstructionData instruction, HexCoord coord)
+    {
+        if (instruction is MoveInstructionData move) return move.Source.Equals(coord) || move.Destination.Equals(coord);
+        if (instruction is SelectInstructionData select) return select.Source.Equals(coord);
+        if (instruction is OperationInstructionData op)
+        {
+            return op.Source.Equals(coord) || op.OperationTile.Equals(coord) || op.AdditionalOperands.Contains(coord);
+        }
+        return false;
     }
 
     private void Update()
@@ -160,6 +324,14 @@ public class GridController : MonoBehaviour
 
         Cell cell = GetCell(processorIndex, columnIndex);
         if (cell != null) cell.Image.color = selectedColor;
+    }
+
+    public void DeselectCell()
+    {
+        Cell previous = GetCell(SelectedProcessor, SelectedColumn);
+        if (previous != null) previous.Image.color = Color.white;
+        SelectedProcessor = -1;
+        SelectedColumn = -1;
     }
 
     public void PlaceInstruction(int processorIndex, int columnIndex, InstructionData instruction)

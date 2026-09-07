@@ -18,13 +18,21 @@ public class InstructionAuthoringController : MonoBehaviour
 
     public bool IsBusy => state != State.Idle;
 
+    public GridController GridController => gridController;
+
     public void CancelPending()
     {
         if (state != State.Idle)
         {
             Reset();
-            Debug.Log("Instruction cancelled — palette selection takes priority.");
+            Debug.Log("Instruction cancelled - palette selection takes priority.");
         }
+    }
+
+    public void ExitInputMode()
+    {
+        CancelPending();
+        gridController.DeselectCell();
     }
 
     private void OnEnable()
@@ -48,6 +56,7 @@ public class InstructionAuthoringController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             Reset();
+            if (gridController != null) gridController.ClearPendingChange();
             return;
         }
 
@@ -84,6 +93,12 @@ public class InstructionAuthoringController : MonoBehaviour
         {
             case State.Idle:
             case State.SubjectSelected:
+                if (gridController.SelectedColumn < 0)
+                {
+                    Debug.Log("Select a cell in the coding grid first.");
+                    break;
+                }
+
                 subject = coord;
                 operands.Clear();
                 hasMoveTarget = false;
@@ -98,7 +113,7 @@ public class InstructionAuthoringController : MonoBehaviour
                     hasMoveTarget = true;
                     Debug.Log($"Move target set: {coord.q},{coord.r}. Press D to commit.");
                 }
-                else
+                else if (!TryRestartSubject(coord))
                 {
                     Debug.Log("Destination must be adjacent to the source tile.");
                 }
@@ -112,7 +127,7 @@ public class InstructionAuthoringController : MonoBehaviour
                     state = State.AwaitingOperands;
                     Debug.Log("Operation tile set. Click operand tiles (adjacent to it), then press D.");
                 }
-                else
+                else if (!TryRestartSubject(coord))
                 {
                     Debug.Log("Must click an operation tile adjacent to the source tile.");
                 }
@@ -124,12 +139,24 @@ public class InstructionAuthoringController : MonoBehaviour
                     operands.Add(coord);
                     Debug.Log($"Operand added: {coord.q},{coord.r} ({operands.Count} total).");
                 }
-                else
+                else if (!TryRestartSubject(coord))
                 {
                     Debug.Log("Operands must be adjacent to the operation tile.");
                 }
                 break;
         }
+    }
+
+    private bool TryRestartSubject(HexCoord coord)
+    {
+        if (labelController.boardState.GetTile(coord) == null) return false;
+
+        subject = coord;
+        operands.Clear();
+        hasMoveTarget = false;
+        state = State.SubjectSelected;
+        Debug.Log($"Subject changed to {coord.q},{coord.r}. Press Z (move), C (operation) or Space (select).");
+        return true;
     }
 
     private void CommitPending()
