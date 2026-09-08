@@ -46,7 +46,9 @@ public class GridController : MonoBehaviour
     }
 
     private List<ProcessorRow> rows = new List<ProcessorRow>();
+    private List<TextMeshProUGUI> headerLabels = new List<TextMeshProUGUI>();
     private int columnCount;
+    private int activeColumn = -1;
     private RectTransform tabRect;
     private TextMeshProUGUI collapseLabel;
     private bool collapsed;
@@ -56,6 +58,8 @@ public class GridController : MonoBehaviour
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
     public int ColumnCount => columnCount;
+
+    public event System.Action OnCellSelected;
 
     public List<CellInstruction> GetColumnInstructions(int columnIndex)
     {
@@ -268,12 +272,35 @@ public class GridController : MonoBehaviour
         GameObject headerCell = Instantiate(headerCellTemplate, columnHeaderRow);
         headerCell.SetActive(true);
         headerCell.name = "Header_" + columnCount;
-        headerCell.transform.Find("NumberText").GetComponent<TextMeshProUGUI>().text = columnCount.ToString();
+        TextMeshProUGUI headerLabel = headerCell.transform.Find("NumberText").GetComponent<TextMeshProUGUI>();
+        headerLabel.text = columnCount.ToString();
+        headerLabels.Add(headerLabel);
 
         for (int p = 0; p < rows.Count; p++)
         {
             rows[p].Cells.Add(CreateCell(rows[p], p, columnCount - 1));
         }
+    }
+
+    public void SetActiveColumn(int columnIndex)
+    {
+        ClearActiveColumn();
+        if (columnIndex >= 0 && columnIndex < headerLabels.Count)
+        {
+            headerLabels[columnIndex].color = selectedColor;
+            headerLabels[columnIndex].fontStyle = FontStyles.Bold;
+            activeColumn = columnIndex;
+        }
+    }
+
+    public void ClearActiveColumn()
+    {
+        if (activeColumn >= 0 && activeColumn < headerLabels.Count)
+        {
+            headerLabels[activeColumn].color = Color.black;
+            headerLabels[activeColumn].fontStyle = FontStyles.Normal;
+        }
+        activeColumn = -1;
     }
 
     private Cell CreateCell(ProcessorRow row, int processorIndex, int columnIndex)
@@ -324,6 +351,8 @@ public class GridController : MonoBehaviour
 
         Cell cell = GetCell(processorIndex, columnIndex);
         if (cell != null) cell.Image.color = selectedColor;
+
+        OnCellSelected?.Invoke();
     }
 
     public void DeselectCell()

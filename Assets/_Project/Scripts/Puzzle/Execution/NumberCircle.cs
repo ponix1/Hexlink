@@ -122,4 +122,17 @@ public class NumberCircle : MonoBehaviour
         }
         transform.localScale = targetScale;
     }
+
+    public IEnumerator WinPulse(float duration)
+    {
+        float t = 0f;
+        while (t < 1f)
+        {
+            t = Mathf.Min(1f, t + Time.deltaTime / duration);
+            float bump = 1f + 0.5f * Mathf.Abs(Mathf.Sin(t * Mathf.PI * 3f));
+            transform.localScale = targetScale * bump;
+            yield return null;
+        }
+        transform.localScale = targetScale * 1.25f;
+    }
 }

@@ -277,6 +277,9 @@ public class InfoTabBuilder
         // --- Play / Reset buttons, top-right above the tab (mirroring the Hide button). ---
         GameObject playButton = CreateTabButton(infoTab.transform, "PlayButton", "Play", new Vector2(-6f, 24f));
         GameObject resetButton = CreateTabButton(infoTab.transform, "ResetButton", "Reset", new Vector2(-102f, 24f));
+        GameObject pauseButton = CreateTabButton(infoTab.transform, "PauseButton", "Pause", new Vector2(-198f, 24f));
+        GameObject stepButton = CreateTabButton(infoTab.transform, "StepButton", "Step", new Vector2(-294f, 24f));
+        GameObject speedButton = CreateTabButton(infoTab.transform, "SpeedButton", "1x", new Vector2(-390f, 24f));
         HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
         if (selector != null)
         {
@@ -325,6 +328,10 @@ public class InfoTabBuilder
         engineSO.FindProperty("hexGridSpawner").objectReferenceValue = Object.FindFirstObjectByType<HexGridSpawner>();
         engineSO.FindProperty("playButton").objectReferenceValue = playButton.GetComponent<Button>();
         engineSO.FindProperty("resetButton").objectReferenceValue = resetButton.GetComponent<Button>();
+        engineSO.FindProperty("pauseButton").objectReferenceValue = pauseButton.GetComponent<Button>();
+        engineSO.FindProperty("stepButton").objectReferenceValue = stepButton.GetComponent<Button>();
+        engineSO.FindProperty("speedButton").objectReferenceValue = speedButton.GetComponent<Button>();
+        engineSO.FindProperty("inventoryUI").objectReferenceValue = Object.FindFirstObjectByType<TileInventoryUI>();
         engineSO.FindProperty("nodePrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Node.prefab");
         SerializedObject labelControllerSO = new SerializedObject(labelController);
         engineSO.FindProperty("tileLabelPrefab").objectReferenceValue = labelControllerSO.FindProperty("tileLabelPrefab").objectReferenceValue;

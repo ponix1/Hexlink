@@ -126,6 +126,7 @@ public class TilePaletteBuilder
         scrollRect.horizontal = false;
         scrollRect.vertical = true;
         scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.scrollSensitivity = 60f;
 
         // --- Sections (explicit sizes — no nested width-control chains). ---
         BuildSection(content.transform, "Numbers", inventoryUI,

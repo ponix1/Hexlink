@@ -10,6 +10,8 @@ public class TileInventoryUI : MonoBehaviour
     // This holds the data for what we want to place (e.g., "7", "+", "_")
     public string CurrentSelectedTile { get; private set; } = "";
 
+    public event System.Action OnTileSelected;
+
     private bool isExpanded = true;
 
     private void Update()
@@ -43,6 +45,7 @@ public class TileInventoryUI : MonoBehaviour
             currentSelectionText.text = $"Selected: {tileValue}";
         }
 
+        OnTileSelected?.Invoke();
         Debug.Log($"Inventory updated. Ready to place: {tileValue}");
     }
 

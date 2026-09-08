@@ -118,6 +118,11 @@ public class HexTileSelector : MonoBehaviour
                 TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
                 if (tileData == null) return;
 
+                if (tileData is FinalTileData)
+                {
+                    tileData = new FinalTileData { targetNumber = GetPuzzleTarget() };
+                }
+
                 TileData existing = labelController.boardState.GetTile(identity.coordinate);
                 GridController grid = GridController;
 
@@ -144,6 +149,15 @@ public class HexTileSelector : MonoBehaviour
                 OnTileClicked?.Invoke(identity.coordinate);
             }
         }
+    }
+
+    private static int GetPuzzleTarget()
+    {
+        if (PuzzleSelection.SelectedPuzzle is StandardPuzzleData standard)
+        {
+            return standard.targetScore;
+        }
+        return 0;
     }
 
     public void HighlightTile(HexCoord coord)

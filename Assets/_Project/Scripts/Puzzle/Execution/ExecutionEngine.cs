@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class ExecutionEngine : MonoBehaviour
 {
@@ -10,31 +11,84 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private HexGridSpawner hexGridSpawner;
     [SerializeField] private Button playButton;
     [SerializeField] private Button resetButton;
+    [SerializeField] private Button pauseButton;
+    [SerializeField] private Button stepButton;
+    [SerializeField] private Button speedButton;
+    [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private GameObject nodePrefab;
     [SerializeField] private GameObject tileLabelPrefab;
     [SerializeField] private float nodeHeightY = 0.59f;
     [SerializeField] private float moveDuration = 0.5f;
     [SerializeField] private float spawnDuration = 0.25f;
     [SerializeField] private float mergePulseDuration = 0.3f;
+    [SerializeField] private Color activeColumnColor = new Color(0.635f, 0.843f, 0.890f);
+
+    private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f };
+    private static readonly string[] SpeedLabels = { "0.5x", "1x", "2x" };
 
     private Dictionary<HexCoord, NumberCircle> circles = new Dictionary<HexCoord, NumberCircle>();
     private bool running;
+    private bool paused;
+    private bool stepQueued;
+    private bool won;
+    private NumberCircle winningCircle;
+    private int speedIndex = 1;
+
+    private float MoveDuration => moveDuration / SpeedOptions[speedIndex];
+    private float SpawnDuration => spawnDuration / SpeedOptions[speedIndex];
+    private float MergePulseDuration => mergePulseDuration / SpeedOptions[speedIndex];
     private float labelWorldScale = 1f;
 
     private void Start()
     {
         if (playButton != null) playButton.onClick.AddListener(Play);
         if (resetButton != null) resetButton.onClick.AddListener(ResetExecution);
+        if (pauseButton != null) pauseButton.onClick.AddListener(TogglePause);
+        if (stepButton != null) stepButton.onClick.AddListener(Step);
+        if (speedButton != null) speedButton.onClick.AddListener(CycleSpeed);
+
+        if (inventoryUI == null) inventoryUI = FindFirstObjectByType<TileInventoryUI>();
+        if (inventoryUI != null) inventoryUI.OnTileSelected += AutoReset;
+        if (gridController != null) gridController.OnCellSelected += AutoReset;
+        if (labelController != null) labelController.boardState.OnCellChanged += AutoReset;
+    }
+
+    private void CycleSpeed()
+    {
+        speedIndex = (speedIndex + 1) % SpeedOptions.Length;
+        UpdateSpeedLabel();
+    }
+
+    private void UpdateSpeedLabel()
+    {
+        if (speedButton == null) return;
+        TextMeshProUGUI label = speedButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null) label.text = SpeedLabels[speedIndex];
     }
 
     public void Play()
     {
-        if (running) return;
-        if (nodePrefab == null || tileLabelPrefab == null)
+        if (running && !paused)
+        {
+            ResetExecution();
+        }
+        else if (running)
+        {
+            paused = false;
+            stepQueued = false;
+            UpdatePauseLabel();
+            return;
+        }
+        else if (nodePrefab == null || tileLabelPrefab == null)
         {
             Debug.LogError("ExecutionEngine: node prefab or tile label prefab missing (re-run Hexlink/Build Info Tab).");
             return;
         }
+        else
+        {
+            ResetExecution();
+        }
+
         StartCoroutine(RunProgram());
     }
 
@@ -42,23 +96,95 @@ public class ExecutionEngine : MonoBehaviour
     {
         StopAllCoroutines();
         running = false;
-        foreach (NumberCircle circle in circles.Values)
+        paused = false;
+        stepQueued = false;
+        won = false;
+        winningCircle = null;
+        UpdatePauseLabel();
+        ClearCircles();
+        if (gridController != null)
+        {
+            gridController.ClearErrors();
+            gridController.ClearPendingChange();
+            gridController.ClearActiveColumn();
+        }
+    }
+
+    public void TogglePause()
+    {
+        paused = !paused;
+        UpdatePauseLabel();
+    }
+
+    public void Step()
+    {
+        if (!running)
+        {
+            if (nodePrefab == null || tileLabelPrefab == null) return;
+
+            ResetExecution();
+            paused = true;
+            StartCoroutine(RunProgram());
+        }
+        else
+        {
+            paused = true;
+        }
+        stepQueued = true;
+        UpdatePauseLabel();
+    }
+
+    private void AutoReset(HexCoord coord)
+    {
+        AutoReset();
+    }
+
+    private void AutoReset()
+    {
+        if (running || circles.Count > 0 || paused)
+        {
+            ResetExecution();
+        }
+    }
+
+    private void UpdatePauseLabel()
+    {
+        if (pauseButton == null) return;
+        TextMeshProUGUI label = pauseButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null) label.text = paused ? "Resume" : "Pause";
+    }
+
+    private void ClearCircles()
+    {
+        // Sweeps every NumberCircle in the scene - mid-merge operand circles are already
+        // removed from the occupancy dict before their animations destroy them, so the
+        // dictionary alone misses them and they would linger on screen after a reset.
+        foreach (NumberCircle circle in FindObjectsByType<NumberCircle>(FindObjectsSortMode.None))
         {
             Destroy(circle.gameObject);
         }
         circles.Clear();
-        gridController.ClearErrors();
     }
 
     private IEnumerator RunProgram()
     {
         running = true;
+        won = false;
+        winningCircle = null;
         InitGeometry();
 
         for (int column = 0; column < gridController.ColumnCount; column++)
         {
             List<GridController.CellInstruction> instructions = gridController.GetColumnInstructions(column);
             if (instructions.Count == 0) continue;
+
+            while (paused && !stepQueued)
+            {
+                yield return null;
+            }
+            stepQueued = false;
+
+            gridController.SetActiveColumn(column);
 
             // Commit phase: instructions may depend on each other (a move vacating the tile
             // an operation needs, a select creating a circle another instruction uses).
@@ -114,9 +240,27 @@ public class ExecutionEngine : MonoBehaviour
             {
                 yield return All(routines);
             }
+
+            gridController.ClearActiveColumn();
+
+            if (won)
+            {
+                yield return WinSequence();
+                running = false;
+                yield break;
+            }
         }
 
         running = false;
+    }
+
+    private IEnumerator WinSequence()
+    {
+        if (winningCircle != null)
+        {
+            Debug.Log($"Puzzle solved! {winningCircle.Value} reached the target tile.");
+            yield return winningCircle.WinPulse(1.2f / SpeedOptions[speedIndex]);
+        }
     }
 
     private class Attempt
@@ -159,7 +303,7 @@ public class ExecutionEngine : MonoBehaviour
         NumberCircle circle = CreateCircle(select.Source);
         circle.SetValue(number.value);
         circles[select.Source] = circle;
-        animation = circle.SpawnAnimation(spawnDuration);
+        animation = circle.SpawnAnimation(SpawnDuration);
         error = null;
         return true;
     }
@@ -194,7 +338,7 @@ public class ExecutionEngine : MonoBehaviour
 
     private IEnumerator MoveAndCheckWin(NumberCircle circle, HexCoord destination)
     {
-        yield return circle.MoveTo(Anchor(destination), moveDuration);
+        yield return circle.MoveTo(Anchor(destination), MoveDuration);
         CheckWin(destination, circle);
     }
 
@@ -322,10 +466,10 @@ public class ExecutionEngine : MonoBehaviour
         Vector3 target = Anchor(subject.Coord);
 
         List<IEnumerator> moves = new List<IEnumerator>();
-        moves.Add(subject.MoveTo(target, moveDuration));
+        moves.Add(subject.MoveTo(target, MoveDuration));
         foreach (NumberCircle operandCircle in operandCircles)
         {
-            moves.Add(operandCircle.MoveTo(target, moveDuration));
+            moves.Add(operandCircle.MoveTo(target, MoveDuration));
         }
         yield return All(moves);
 
@@ -334,7 +478,7 @@ public class ExecutionEngine : MonoBehaviour
             Destroy(operandCircle.gameObject);
         }
         subject.SetValue(result);
-        yield return subject.MergePulse(mergePulseDuration);
+        yield return subject.MergePulse(MergePulseDuration);
     }
 
     private int Apply(OperationTileData.OperationType operation, int a, int b)
@@ -361,11 +505,11 @@ public class ExecutionEngine : MonoBehaviour
 
     private void CheckWin(HexCoord coord, NumberCircle circle)
     {
+        if (won) return;
         if (labelController.boardState.GetTile(coord) is FinalTileData final && final.targetNumber == circle.Value)
         {
-            running = false;
-            Debug.Log($"Puzzle solved! {circle.Value} reached the target tile.");
-            StopAllCoroutines();
+            won = true;
+            winningCircle = circle;
         }
     }
 
