@@ -274,12 +274,31 @@ public class InfoTabBuilder
         collapseTextRT.offsetMin = Vector2.zero;
         collapseTextRT.offsetMax = Vector2.zero;
 
-        // --- Play / Reset buttons, top-right above the tab (mirroring the Hide button). ---
-        GameObject playButton = CreateTabButton(infoTab.transform, "PlayButton", "Play", new Vector2(-6f, 24f));
-        GameObject resetButton = CreateTabButton(infoTab.transform, "ResetButton", "Reset", new Vector2(-102f, 24f));
-        GameObject pauseButton = CreateTabButton(infoTab.transform, "PauseButton", "Pause", new Vector2(-198f, 24f));
-        GameObject stepButton = CreateTabButton(infoTab.transform, "StepButton", "Step", new Vector2(-294f, 24f));
-        GameObject speedButton = CreateTabButton(infoTab.transform, "SpeedButton", "1x", new Vector2(-390f, 24f));
+        // --- Control strip: dedicated button column on the tab's right edge. ---
+        GameObject controlStrip = new GameObject("ControlStrip", typeof(RectTransform), typeof(Image));
+        controlStrip.transform.SetParent(infoTab.transform, false);
+        controlStrip.GetComponent<Image>().color = Color.white;
+        RectTransform stripRT = controlStrip.GetComponent<RectTransform>();
+        stripRT.anchorMin = new Vector2(1f, 0f);
+        stripRT.anchorMax = new Vector2(1f, 1f);
+        stripRT.pivot = new Vector2(1f, 0.5f);
+        stripRT.anchoredPosition = Vector2.zero;
+        stripRT.sizeDelta = new Vector2(320f, 0f);
+
+        GameObject playButton = CreateStripButton(controlStrip.transform, "PlayButton", "Play", -10f);
+        GameObject pauseButton = CreateStripButton(controlStrip.transform, "PauseButton", "Pause", -54f);
+        GameObject stepButton = CreateStripButton(controlStrip.transform, "StepButton", "Step", -98f);
+        GameObject resetButton = CreateStripButton(controlStrip.transform, "ResetButton", "Reset", -142f);
+
+        GameObject speedLabel = CreateTMP("SpeedLabel", controlStrip.transform, "1.0x", 12, FontStyles.Bold);
+        RectTransform speedLabelRT = speedLabel.GetComponent<RectTransform>();
+        speedLabelRT.anchorMin = new Vector2(0.5f, 0f);
+        speedLabelRT.anchorMax = new Vector2(0.5f, 0f);
+        speedLabelRT.pivot = new Vector2(0.5f, 0f);
+        speedLabelRT.anchoredPosition = new Vector2(0f, 40f);
+        speedLabelRT.sizeDelta = new Vector2(300f, 16f);
+
+        GameObject speedSlider = CreateSlider(controlStrip.transform);
         HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
         if (selector != null)
         {
@@ -327,10 +346,11 @@ public class InfoTabBuilder
         engineSO.FindProperty("labelController").objectReferenceValue = labelController;
         engineSO.FindProperty("hexGridSpawner").objectReferenceValue = Object.FindFirstObjectByType<HexGridSpawner>();
         engineSO.FindProperty("playButton").objectReferenceValue = playButton.GetComponent<Button>();
-        engineSO.FindProperty("resetButton").objectReferenceValue = resetButton.GetComponent<Button>();
         engineSO.FindProperty("pauseButton").objectReferenceValue = pauseButton.GetComponent<Button>();
         engineSO.FindProperty("stepButton").objectReferenceValue = stepButton.GetComponent<Button>();
-        engineSO.FindProperty("speedButton").objectReferenceValue = speedButton.GetComponent<Button>();
+        engineSO.FindProperty("resetButton").objectReferenceValue = resetButton.GetComponent<Button>();
+        engineSO.FindProperty("speedSlider").objectReferenceValue = speedSlider.GetComponent<Slider>();
+        engineSO.FindProperty("speedLabel").objectReferenceValue = speedLabel.GetComponent<TextMeshProUGUI>();
         engineSO.FindProperty("inventoryUI").objectReferenceValue = Object.FindFirstObjectByType<TileInventoryUI>();
         engineSO.FindProperty("nodePrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Node.prefab");
         SerializedObject labelControllerSO = new SerializedObject(labelController);
@@ -342,6 +362,97 @@ public class InfoTabBuilder
                    "ColumnHeaderRow (active) plus HeaderCellTemplate / ProcessorRowTemplate / CellTemplate / " +
                    "SquareTokenTemplate / ArrowTokenTemplate (all disabled stamps) — instantiate these at runtime to grow the grid. " +
                    "GridController + InstructionAuthoringController + ExecutionEngine attached to InfoTab with references wired.");
+    }
+
+    private static GameObject CreateStripButton(Transform parent, string name, string label, float yOffset)
+    {
+        GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+        button.transform.SetParent(parent, false);
+        Image image = button.GetComponent<Image>();
+        image.color = Color.white;
+        Button buttonComponent = button.GetComponent<Button>();
+        buttonComponent.targetGraphic = image;
+
+        RectTransform rt = button.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0.5f, 1f);
+        rt.anchorMax = new Vector2(0.5f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, yOffset);
+        rt.sizeDelta = new Vector2(300f, 38f);
+
+        GameObject text = CreateTMP("Label", button.transform, label, 13, FontStyles.Bold);
+        StretchFull(text.GetComponent<RectTransform>());
+        return button;
+    }
+
+    private static GameObject CreateSlider(Transform parent)
+    {
+        GameObject sliderGO = new GameObject("SpeedSlider", typeof(RectTransform), typeof(Slider));
+        sliderGO.transform.SetParent(parent, false);
+        RectTransform sliderRT = sliderGO.GetComponent<RectTransform>();
+        sliderRT.anchorMin = new Vector2(0.5f, 0f);
+        sliderRT.anchorMax = new Vector2(0.5f, 0f);
+        sliderRT.pivot = new Vector2(0.5f, 0f);
+        sliderRT.anchoredPosition = new Vector2(0f, 8f);
+        sliderRT.sizeDelta = new Vector2(300f, 24f);
+
+        GameObject background = new GameObject("Background", typeof(RectTransform), typeof(Image));
+        background.transform.SetParent(sliderGO.transform, false);
+        background.GetComponent<Image>().color = new Color(0.82f, 0.82f, 0.84f);
+        RectTransform backgroundRT = background.GetComponent<RectTransform>();
+        backgroundRT.anchorMin = new Vector2(0f, 0.5f);
+        backgroundRT.anchorMax = new Vector2(1f, 0.5f);
+        backgroundRT.pivot = new Vector2(0.5f, 0.5f);
+        backgroundRT.sizeDelta = new Vector2(0f, 8f);
+        backgroundRT.anchoredPosition = Vector2.zero;
+
+        GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
+        fillArea.transform.SetParent(sliderGO.transform, false);
+        RectTransform fillAreaRT = fillArea.GetComponent<RectTransform>();
+        fillAreaRT.anchorMin = new Vector2(0f, 0.5f);
+        fillAreaRT.anchorMax = new Vector2(1f, 0.5f);
+        fillAreaRT.pivot = new Vector2(0.5f, 0.5f);
+        fillAreaRT.sizeDelta = new Vector2(-10f, 8f);
+        fillAreaRT.anchoredPosition = Vector2.zero;
+
+        // The Slider component drives this rect's anchorMax.x between 0 and 1 as the value changes.
+        GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fill.transform.SetParent(fillArea.transform, false);
+        fill.GetComponent<Image>().color = new Color(0.635f, 0.843f, 0.890f);
+        RectTransform fillRT = fill.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = new Vector2(0f, 1f);
+        fillRT.pivot = new Vector2(0f, 0.5f);
+        fillRT.offsetMin = Vector2.zero;
+        fillRT.offsetMax = Vector2.zero;
+
+        GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
+        handleArea.transform.SetParent(sliderGO.transform, false);
+        RectTransform handleAreaRT = handleArea.GetComponent<RectTransform>();
+        handleAreaRT.anchorMin = Vector2.zero;
+        handleAreaRT.anchorMax = Vector2.one;
+        handleAreaRT.offsetMin = new Vector2(8f, 0f);
+        handleAreaRT.offsetMax = new Vector2(-8f, 0f);
+
+        GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+        handle.transform.SetParent(handleArea.transform, false);
+        handle.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.24f);
+        RectTransform handleRT = handle.GetComponent<RectTransform>();
+        handleRT.anchorMin = new Vector2(0.5f, 0.5f);
+        handleRT.anchorMax = new Vector2(0.5f, 0.5f);
+        handleRT.pivot = new Vector2(0.5f, 0.5f);
+        handleRT.sizeDelta = new Vector2(16f, 16f);
+
+        Slider slider = sliderGO.GetComponent<Slider>();
+        slider.fillRect = fillRT;
+        slider.handleRect = handleRT;
+        slider.targetGraphic = handle.GetComponent<Image>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0.25f;
+        slider.maxValue = 3f;
+        slider.value = 1f;
+
+        return sliderGO;
     }
 
     private static GameObject CreateTabButton(Transform parent, string name, string label, Vector2 anchoredPosition)
@@ -370,17 +481,26 @@ public class InfoTabBuilder
         return button;
     }
 
+    private static void StretchFull(RectTransform rt)
+    {
+        rt.anchorMin = Vector2.zero;
+        rt.anchorMax = Vector2.one;
+        rt.offsetMin = Vector2.zero;
+        rt.offsetMax = Vector2.zero;
+    }
+
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
         go.transform.SetParent(parent, false);
         TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
         tmp.text = text;
-        tmp.fontSize = fontSize;
+        tmp.fontSize = Mathf.Max(8f, Mathf.Round(fontSize * GameOptions.UiScale));
         tmp.fontStyle = style;
         tmp.color = Color.black;
+        tmp.alignment = TextAlignmentOptions.Center;
         LayoutElement le = go.AddComponent<LayoutElement>();
-        le.preferredHeight = fontSize * 1.4f;
+        le.preferredHeight = tmp.fontSize * 1.4f;
         return go;
     }
 }

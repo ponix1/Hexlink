@@ -222,11 +222,11 @@ public class TilePaletteBuilder
         go.transform.SetParent(parent, false);
         TextMeshProUGUI tmp = go.GetComponent<TextMeshProUGUI>();
         tmp.text = text;
-        tmp.fontSize = fontSize;
+        tmp.fontSize = Mathf.Max(8f, Mathf.Round(fontSize * GameOptions.UiScale));
         tmp.fontStyle = style;
         tmp.color = Color.black;
         tmp.alignment = TextAlignmentOptions.Center;
-        go.AddComponent<LayoutElement>().preferredHeight = fontSize * 1.4f;
+        go.AddComponent<LayoutElement>().preferredHeight = tmp.fontSize * 1.4f;
         return go;
     }
 

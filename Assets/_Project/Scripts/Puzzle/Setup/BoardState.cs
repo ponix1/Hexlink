@@ -7,6 +7,8 @@ public class BoardState
 
     public event Action<HexCoord> OnCellChanged;
 
+    public IReadOnlyDictionary<HexCoord, TileData> AllTiles => tiles;
+
     public bool HasTile(HexCoord coord)
     {
         return tiles.ContainsKey(coord);

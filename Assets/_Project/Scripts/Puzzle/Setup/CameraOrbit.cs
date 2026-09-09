@@ -2,10 +2,9 @@ using UnityEngine;
 
 public class CameraOrbit : MonoBehaviour
 {
-    [SerializeField] private float rotationSpeed = 5f;
-    [SerializeField] private float panSpeed = 0.02f;
     [SerializeField] private Vector3 boardCenter = Vector3.zero;
     [SerializeField] private KeyCode recenterKey = KeyCode.F;
+    [SerializeField] private float screenShift = 0.3f;
 
     private float currentHorizontalAngle;
     private float currentVerticalAngle;
@@ -16,10 +15,16 @@ public class CameraOrbit : MonoBehaviour
         currentHorizontalAngle = transform.eulerAngles.y;
         currentVerticalAngle = transform.eulerAngles.x;
 
+        // The rig stays at the board centre so orbiting stays centred; the "board higher
+        // on screen" framing is done by skewing the projection matrix instead - it is
+        // independent of camera rotation and distance.
         childCamera = GetComponentInChildren<Camera>();
         if (childCamera != null)
         {
             childCamera.transform.LookAt(transform);
+            Matrix4x4 projection = childCamera.projectionMatrix;
+            projection[1, 2] -= screenShift;
+            childCamera.projectionMatrix = projection;
         }
     }
 
@@ -46,8 +51,8 @@ public class CameraOrbit : MonoBehaviour
             float mouseX = Input.GetAxis("Mouse X");
             float mouseY = Input.GetAxis("Mouse Y");
 
-            currentHorizontalAngle += mouseX * rotationSpeed;
-            currentVerticalAngle -= mouseY * rotationSpeed;
+            currentHorizontalAngle += mouseX * GameOptions.OrbitSpeed;
+            currentVerticalAngle -= mouseY * GameOptions.OrbitSpeed;
 
             transform.eulerAngles = new Vector3(currentVerticalAngle, currentHorizontalAngle, 0f);
         }
@@ -61,11 +66,13 @@ public class CameraOrbit : MonoBehaviour
         Vector3 right = childCamera.transform.right;
         forward.y = 0f;
         right.y = 0f;
+        forward.Normalize();
+        right.Normalize();
 
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
         float zoomFactor = Vector3.Distance(transform.position, childCamera.transform.position);
 
-        transform.position += (-right * mouseX - forward * mouseY) * (panSpeed * zoomFactor);
+        transform.position += (-right * mouseX - forward * mouseY) * (GameOptions.PanSpeed * zoomFactor);
     }
 }

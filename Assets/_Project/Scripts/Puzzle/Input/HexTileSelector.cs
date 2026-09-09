@@ -35,6 +35,11 @@ public class HexTileSelector : MonoBehaviour
         {
             EventSystem.current.sendNavigationEvents = false;
         }
+
+        if (GameOptions.ColourBlindMode)
+        {
+            highlightColor = new Color(0f, 0.85f, 1f);
+        }
     }
 
     private void Update()
@@ -126,7 +131,7 @@ public class HexTileSelector : MonoBehaviour
                 TileData existing = labelController.boardState.GetTile(identity.coordinate);
                 GridController grid = GridController;
 
-                if (existing != null && grid != null && grid.HasInstructionsReferencing(identity.coordinate))
+                if (GameOptions.ConfirmTileChanges && existing != null && grid != null && grid.HasInstructionsReferencing(identity.coordinate))
                 {
                     if (grid.IsPendingChange(identity.coordinate))
                     {

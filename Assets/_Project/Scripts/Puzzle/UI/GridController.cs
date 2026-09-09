@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -20,6 +21,7 @@ public class GridController : MonoBehaviour
     [SerializeField] private Color selectedColor = new Color(0.635f, 0.843f, 0.890f);
     [SerializeField] private Color errorColor = new Color(0.9f, 0.3f, 0.3f);
     [SerializeField] private Color pendingChangeColor = Color.yellow;
+    [SerializeField] private Color normalCellColor = Color.white;
 
     private HexCoord? pendingChangeCoord;
 
@@ -58,6 +60,7 @@ public class GridController : MonoBehaviour
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
     public int ColumnCount => columnCount;
+    public int ProcessorCount => rows.Count;
 
     public event System.Action OnCellSelected;
 
@@ -94,7 +97,7 @@ public class GridController : MonoBehaviour
         {
             for (int c = 0; c < rows[p].Cells.Count; c++)
             {
-                rows[p].Cells[c].Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : Color.white;
+                rows[p].Cells[c].Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : normalCellColor;
             }
         }
     }
@@ -105,6 +108,13 @@ public class GridController : MonoBehaviour
         expandedHeight = tabRect.sizeDelta.y;
         targetHeight = expandedHeight;
 
+        if (GameOptions.ColourBlindMode)
+        {
+            selectedColor = new Color(0.36f, 0.63f, 0.94f);
+            errorColor = new Color(0.85f, 0.45f, 0.13f);
+            pendingChangeColor = new Color(0.55f, 0.45f, 0.85f);
+        }
+
         if (collapseButton != null)
         {
             collapseLabel = collapseButton.GetComponentInChildren<TextMeshProUGUI>();
@@ -114,6 +124,108 @@ public class GridController : MonoBehaviour
         AddProcessorRow();
         AddColumn();
         SelectCell(0, 0);
+
+        StartCoroutine(RestoreWhenReady());
+    }
+
+    private IEnumerator RestoreWhenReady()
+    {
+        // HexGridSpawner populates its tiles in Start(); script order between components
+        // is undefined, so wait a frame before restoring tiles that need hexes to exist.
+        yield return null;
+        RestoreSavedSolution();
+    }
+
+    public void GrowTo(int processorCount, int columnCountTarget)
+    {
+        while (rows.Count < processorCount) AddProcessorRow();
+        while (columnCount < columnCountTarget) AddColumn();
+    }
+
+    public void SetInstruction(int processorIndex, int columnIndex, InstructionData instruction)
+    {
+        Cell cell = GetCell(processorIndex, columnIndex);
+        if (cell == null) return;
+
+        cell.Instruction = instruction;
+        foreach (Transform token in cell.InstructionContainer)
+        {
+            Destroy(token.gameObject);
+        }
+        RenderInstruction(cell, instruction);
+    }
+
+    private void RestoreSavedSolution()
+    {
+        if (PuzzleSelection.SelectedPuzzle == null) return;
+
+        SavedSolution saved = SolutionStore.LoadNewest(PuzzleSelection.SelectedPuzzle.puzzleID);
+        if (saved == null) return;
+
+        ApplySolution(saved);
+        Debug.Log($"Restored saved solution '{saved.name}' for '{saved.puzzleID}'.");
+    }
+
+    public void ApplySolution(SavedSolution saved)
+    {
+        if (saved == null) return;
+
+        GrowTo(Mathf.Max(1, saved.processors), Mathf.Max(1, saved.columns));
+        WipeCurrent();
+
+        foreach (SavedTile tile in saved.tiles)
+        {
+            TileData data = TileDataFactory.CreateFromSymbol(tile.symbol);
+            if (data is FinalTileData finalTile)
+            {
+                finalTile.targetNumber = tile.target;
+            }
+            if (data != null)
+            {
+                labelController.boardState.PlaceTile(new HexCoord(tile.q, tile.r), data);
+            }
+        }
+
+        foreach (SavedInstruction instruction in saved.instructions)
+        {
+            InstructionData data = SolutionStore.ToInstructionData(instruction);
+            if (data != null)
+            {
+                SetInstruction(instruction.processor, instruction.column, data);
+            }
+        }
+
+        ClearPendingChange();
+        SelectCell(0, 0);
+    }
+
+    public void ClearAll()
+    {
+        WipeCurrent();
+        ClearPendingChange();
+        SelectCell(0, 0);
+    }
+
+    private void WipeCurrent()
+    {
+        for (int p = 0; p < rows.Count; p++)
+        {
+            for (int c = 0; c < rows[p].Cells.Count; c++)
+            {
+                Cell cell = rows[p].Cells[c];
+                cell.Instruction = null;
+                foreach (Transform token in cell.InstructionContainer)
+                {
+                    Destroy(token.gameObject);
+                }
+            }
+        }
+
+        List<HexCoord> occupied = new List<HexCoord>(labelController.boardState.AllTiles.Keys);
+        foreach (HexCoord coord in occupied)
+        {
+            labelController.boardState.RemoveTile(coord);
+        }
     }
 
     private void OnEnable()
@@ -216,7 +328,7 @@ public class GridController : MonoBehaviour
 
     private void RestoreCellColor(Cell cell, int p, int c)
     {
-        cell.Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : Color.white;
+        cell.Image.color = (p == SelectedProcessor && c == SelectedColumn) ? selectedColor : normalCellColor;
     }
 
     private static bool ReferencesCoord(InstructionData instruction, HexCoord coord)
@@ -344,7 +456,7 @@ public class GridController : MonoBehaviour
         if (inventoryUI != null) inventoryUI.DeselectTile();
 
         Cell previous = GetCell(SelectedProcessor, SelectedColumn);
-        if (previous != null) previous.Image.color = Color.white;
+        if (previous != null) previous.Image.color = normalCellColor;
 
         SelectedProcessor = processorIndex;
         SelectedColumn = columnIndex;
@@ -358,7 +470,7 @@ public class GridController : MonoBehaviour
     public void DeselectCell()
     {
         Cell previous = GetCell(SelectedProcessor, SelectedColumn);
-        if (previous != null) previous.Image.color = Color.white;
+        if (previous != null) previous.Image.color = normalCellColor;
         SelectedProcessor = -1;
         SelectedColumn = -1;
     }
@@ -504,3 +616,4 @@ public class CellClickHandler : MonoBehaviour, IPointerClickHandler
         OnClick?.Invoke(eventData);
     }
 }
+

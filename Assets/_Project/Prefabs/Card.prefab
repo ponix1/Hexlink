@@ -506,6 +506,7 @@ MonoBehaviour:
   puzzleNameText: {fileID: 6968753743402251373}
   targetNumText: {fileID: 5526881266379377528}
   starsText: {fileID: 4733200262038716643}
+  completeBadge: {fileID: 0}
   puzzleSceneName: Puzzle_Play
 --- !u!114 &6518279907361263684
 MonoBehaviour:

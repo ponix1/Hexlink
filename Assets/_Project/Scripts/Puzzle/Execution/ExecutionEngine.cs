@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
@@ -13,7 +14,8 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private Button resetButton;
     [SerializeField] private Button pauseButton;
     [SerializeField] private Button stepButton;
-    [SerializeField] private Button speedButton;
+    [SerializeField] private Slider speedSlider;
+    [SerializeField] private TextMeshProUGUI speedLabel;
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private GameObject nodePrefab;
     [SerializeField] private GameObject tileLabelPrefab;
@@ -23,29 +25,34 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private float mergePulseDuration = 0.3f;
     [SerializeField] private Color activeColumnColor = new Color(0.635f, 0.843f, 0.890f);
 
-    private static readonly float[] SpeedOptions = { 0.5f, 1f, 2f };
-    private static readonly string[] SpeedLabels = { "0.5x", "1x", "2x" };
-
     private Dictionary<HexCoord, NumberCircle> circles = new Dictionary<HexCoord, NumberCircle>();
     private bool running;
     private bool paused;
     private bool stepQueued;
     private bool won;
     private NumberCircle winningCircle;
-    private int speedIndex = 1;
+    private float speedMultiplier = 1f;
 
-    private float MoveDuration => moveDuration / SpeedOptions[speedIndex];
-    private float SpawnDuration => spawnDuration / SpeedOptions[speedIndex];
-    private float MergePulseDuration => mergePulseDuration / SpeedOptions[speedIndex];
+    private float MoveDuration => GameOptions.ReducedMotion ? 0.01f : moveDuration / speedMultiplier;
+    private float SpawnDuration => GameOptions.ReducedMotion ? 0.01f : spawnDuration / speedMultiplier;
+    private float MergePulseDuration => GameOptions.ReducedMotion ? 0.01f : mergePulseDuration / speedMultiplier;
     private float labelWorldScale = 1f;
 
     private void Start()
     {
-        if (playButton != null) playButton.onClick.AddListener(Play);
-        if (resetButton != null) resetButton.onClick.AddListener(ResetExecution);
-        if (pauseButton != null) pauseButton.onClick.AddListener(TogglePause);
-        if (stepButton != null) stepButton.onClick.AddListener(Step);
-        if (speedButton != null) speedButton.onClick.AddListener(CycleSpeed);
+        if (playButton != null) playButton.onClick.AddListener(OnPlayClicked);
+        if (resetButton != null) resetButton.onClick.AddListener(OnResetClicked);
+        if (pauseButton != null) pauseButton.onClick.AddListener(OnPauseClicked);
+        if (stepButton != null) stepButton.onClick.AddListener(OnStepClicked);
+
+        speedMultiplier = Mathf.Clamp(GameOptions.ExecutionSpeed, 0.25f, 3f);
+        if (speedSlider != null)
+        {
+            speedSlider.value = speedMultiplier;
+            speedSlider.onValueChanged.AddListener(SetSpeedMultiplier);
+        }
+        UpdateSpeedLabel();
+        UpdatePlayLabel();
 
         if (inventoryUI == null) inventoryUI = FindFirstObjectByType<TileInventoryUI>();
         if (inventoryUI != null) inventoryUI.OnTileSelected += AutoReset;
@@ -53,17 +60,63 @@ public class ExecutionEngine : MonoBehaviour
         if (labelController != null) labelController.boardState.OnCellChanged += AutoReset;
     }
 
-    private void CycleSpeed()
+    private void OnPlayClicked()
     {
-        speedIndex = (speedIndex + 1) % SpeedOptions.Length;
+        Deselect();
+        if (running)
+        {
+            ResetExecution();
+        }
+        else
+        {
+            Play();
+        }
+    }
+
+    private void OnResetClicked()
+    {
+        Deselect();
+        ResetExecution();
+    }
+
+    private void OnPauseClicked()
+    {
+        Deselect();
+        TogglePause();
+    }
+
+    private void OnStepClicked()
+    {
+        Deselect();
+        Step();
+    }
+
+    private void Deselect()
+    {
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+    }
+
+    private void UpdatePlayLabel()
+    {
+        if (playButton == null) return;
+        TextMeshProUGUI label = playButton.GetComponentInChildren<TextMeshProUGUI>();
+        if (label != null) label.text = running ? "Stop" : "Play";
+    }
+
+    private void SetSpeedMultiplier(float value)
+    {
+        speedMultiplier = Mathf.Clamp(value, 0.25f, 3f);
+        GameOptions.ExecutionSpeed = speedMultiplier;
+        GameOptions.Save();
         UpdateSpeedLabel();
     }
 
     private void UpdateSpeedLabel()
     {
-        if (speedButton == null) return;
-        TextMeshProUGUI label = speedButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (label != null) label.text = SpeedLabels[speedIndex];
+        if (speedLabel != null) speedLabel.text = speedMultiplier.ToString("F1") + "x";
     }
 
     public void Play()
@@ -87,9 +140,13 @@ public class ExecutionEngine : MonoBehaviour
         else
         {
             ResetExecution();
+            speedMultiplier = Mathf.Clamp(GameOptions.ExecutionSpeed, 0.25f, 3f);
+            if (speedSlider != null) speedSlider.value = speedMultiplier;
+            UpdateSpeedLabel();
         }
 
         StartCoroutine(RunProgram());
+        UpdatePlayLabel();
     }
 
     public void ResetExecution()
@@ -101,6 +158,7 @@ public class ExecutionEngine : MonoBehaviour
         won = false;
         winningCircle = null;
         UpdatePauseLabel();
+        UpdatePlayLabel();
         ClearCircles();
         if (gridController != null)
         {
@@ -124,6 +182,9 @@ public class ExecutionEngine : MonoBehaviour
 
             ResetExecution();
             paused = true;
+            speedMultiplier = Mathf.Clamp(GameOptions.ExecutionSpeed, 0.25f, 3f);
+            if (speedSlider != null) speedSlider.value = speedMultiplier;
+            UpdateSpeedLabel();
             StartCoroutine(RunProgram());
         }
         else
@@ -247,11 +308,13 @@ public class ExecutionEngine : MonoBehaviour
             {
                 yield return WinSequence();
                 running = false;
+                UpdatePlayLabel();
                 yield break;
             }
         }
 
         running = false;
+        UpdatePlayLabel();
     }
 
     private IEnumerator WinSequence()
@@ -259,7 +322,12 @@ public class ExecutionEngine : MonoBehaviour
         if (winningCircle != null)
         {
             Debug.Log($"Puzzle solved! {winningCircle.Value} reached the target tile.");
-            yield return winningCircle.WinPulse(1.2f / SpeedOptions[speedIndex]);
+            if (PuzzleSelection.SelectedPuzzle != null)
+            {
+                PuzzleProgress.MarkComplete(PuzzleSelection.SelectedPuzzle.puzzleID);
+                SolutionStore.Save(PuzzleSelection.SelectedPuzzle, labelController.boardState, gridController);
+            }
+            yield return winningCircle.WinPulse(1.2f / speedMultiplier);
         }
     }
 
