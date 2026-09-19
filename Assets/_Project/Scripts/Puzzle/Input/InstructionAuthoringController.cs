@@ -63,8 +63,16 @@ public class InstructionAuthoringController : MonoBehaviour
         switch (state)
         {
             case State.SubjectSelected:
-                if (Input.GetKeyDown(KeyCode.Z)) state = State.AwaitingMoveTarget;
-                else if (Input.GetKeyDown(KeyCode.C)) state = State.AwaitingOperationTile;
+                if (Input.GetKeyDown(KeyCode.Z))
+                {
+                    state = State.AwaitingMoveTarget;
+                    if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, tileSelector.GetExistingNeighbors(subject));
+                }
+                else if (Input.GetKeyDown(KeyCode.C))
+                {
+                    state = State.AwaitingOperationTile;
+                    if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, tileSelector.GetAdjacentOperationTiles(subject));
+                }
                 else if (Input.GetKeyDown(KeyCode.Space))
                 {
                     if (labelController.boardState.GetTile(subject) is NumberTileData)
@@ -103,6 +111,7 @@ public class InstructionAuthoringController : MonoBehaviour
                 operands.Clear();
                 hasMoveTarget = false;
                 state = State.SubjectSelected;
+                if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, null);
                 Debug.Log($"Subject set: {coord.q},{coord.r}. Press Z (move), C (operation) or Space (select).");
                 break;
 
@@ -120,12 +129,33 @@ public class InstructionAuthoringController : MonoBehaviour
                 break;
 
             case State.AwaitingOperationTile:
-                if (AreAdjacent(subject, coord) && labelController.boardState.GetTile(coord) is OperationTileData)
+                if (AreAdjacent(subject, coord) && labelController.boardState.GetTile(coord) is OperationTileData opData)
                 {
                     operationTile = coord;
                     operands.Clear();
-                    state = State.AwaitingOperands;
-                    Debug.Log("Operation tile set. Click operand tiles (adjacent to it), then press D.");
+
+                    bool unary = opData.operation == OperationTileData.OperationType.Factorial
+                              || opData.operation == OperationTileData.OperationType.SquareRoot;
+                    if (unary)
+                    {
+                        // Unary operations take no operands - clicking one commits
+                        // the instruction outright, no operand stage, no extra prompt.
+                        gridController.PlaceInstruction(gridController.SelectedProcessor, gridController.SelectedColumn,
+                            new OperationInstructionData
+                            {
+                                Source = subject,
+                                OperationTile = operationTile,
+                                Operation = opData.operation,
+                                AdditionalOperands = new List<HexCoord>()
+                            });
+                        Reset();
+                    }
+                    else
+                    {
+                        state = State.AwaitingOperands;
+                        if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, GetOperandCandidates());
+                        Debug.Log("Operation tile set. Click operand tiles (adjacent to it), then press D.");
+                    }
                 }
                 else if (!TryRestartSubject(coord))
                 {
@@ -134,9 +164,18 @@ public class InstructionAuthoringController : MonoBehaviour
                 break;
 
             case State.AwaitingOperands:
-                if (AreAdjacent(operationTile, coord))
+                if (coord.Equals(subject))
+                {
+                    Debug.Log("The subject can't also be an operand.");
+                }
+                else if (operands.Contains(coord))
+                {
+                    Debug.Log("That tile is already an operand.");
+                }
+                else if (AreAdjacent(operationTile, coord))
                 {
                     operands.Add(coord);
+                    if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, GetOperandCandidates());
                     Debug.Log($"Operand added: {coord.q},{coord.r} ({operands.Count} total).");
                 }
                 else if (!TryRestartSubject(coord))
@@ -147,6 +186,20 @@ public class InstructionAuthoringController : MonoBehaviour
         }
     }
 
+    private List<HexCoord> GetOperandCandidates()
+    {
+        List<HexCoord> result = new List<HexCoord>();
+        if (tileSelector == null) return result;
+
+        foreach (HexCoord neighbor in tileSelector.GetExistingNeighbors(operationTile))
+        {
+            if (neighbor.Equals(subject)) continue;
+            if (operands.Contains(neighbor)) continue;
+            result.Add(neighbor);
+        }
+        return result;
+    }
+
     private bool TryRestartSubject(HexCoord coord)
     {
         if (labelController.boardState.GetTile(coord) == null) return false;
@@ -155,6 +208,7 @@ public class InstructionAuthoringController : MonoBehaviour
         operands.Clear();
         hasMoveTarget = false;
         state = State.SubjectSelected;
+        if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, null);
         Debug.Log($"Subject changed to {coord.q},{coord.r}. Press Z (move), C (operation) or Space (select).");
         return true;
     }
@@ -203,6 +257,7 @@ public class InstructionAuthoringController : MonoBehaviour
         state = State.Idle;
         operands.Clear();
         hasMoveTarget = false;
+        if (tileSelector != null) tileSelector.ClearAuthoringPrompt();
     }
 
     private bool AreAdjacent(HexCoord a, HexCoord b)

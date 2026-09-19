@@ -57,9 +57,9 @@ public static class SolutionStore
 {
     private static string DirectoryPath => Path.Combine(Application.persistentDataPath, "solutions");
 
-    public static void Save(PuzzleData puzzle, BoardState board, GridController grid, string name = null)
+    public static SavedSolution Save(PuzzleData puzzle, BoardState board, GridController grid, string name = null)
     {
-        if (puzzle == null || board == null || grid == null) return;
+        if (puzzle == null || board == null || grid == null) return null;
 
         try
         {
@@ -79,21 +79,37 @@ public static class SolutionStore
             solution.name = name;
             solution.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
 
-            if (ContainsDuplicate(file, solution))
-            {
-                Debug.Log("SolutionStore: identical solution already saved - skipped.");
-                return;
-            }
-
             file.entries.Add(solution);
-
-            Directory.CreateDirectory(DirectoryPath);
-            File.WriteAllText(Path.Combine(DirectoryPath, FileName(puzzle.puzzleID)), JsonUtility.ToJson(file, true));
+            WriteFile(puzzle.puzzleID, file);
             Debug.Log($"Solution '{solution.name}' saved for '{puzzle.puzzleID}' ({solution.tiles.Count} tiles, {solution.instructions.Count} instructions).");
+            return solution;
         }
         catch (Exception e)
         {
             Debug.LogWarning($"SolutionStore: failed to save solution - {e.Message}");
+            return null;
+        }
+    }
+
+    public static bool UpdateEntry(string puzzleID, int index, SavedSolution solution)
+    {
+        if (string.IsNullOrEmpty(puzzleID) || solution == null) return false;
+
+        try
+        {
+            SavedSolutionFile file = LoadFile(puzzleID);
+            if (index < 0 || index >= file.entries.Count) return false;
+
+            solution.name = file.entries[index].name;
+            solution.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+            file.entries[index] = solution;
+            WriteFile(puzzleID, file);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"SolutionStore: failed to update solution - {e.Message}");
+            return false;
         }
     }
 
@@ -170,10 +186,45 @@ public static class SolutionStore
         }
         catch (Exception e)
         {
-            Debug.LogWarning($"SolutionStore: failed to load solutions - {e.Message}");
+            Quarantine(puzzleID);
+            Debug.LogWarning($"SolutionStore: solutions file was unreadable and has been set aside as '.bad' - {e.Message}");
         }
 
         return new SavedSolutionFile();
+    }
+
+    private static void WriteFile(string puzzleID, SavedSolutionFile file)
+    {
+        Directory.CreateDirectory(DirectoryPath);
+        string path = Path.Combine(DirectoryPath, FileName(puzzleID));
+        string tempPath = path + ".tmp";
+
+        File.WriteAllText(tempPath, JsonUtility.ToJson(file, true));
+        if (File.Exists(path))
+        {
+            File.Replace(tempPath, path, null);
+        }
+        else
+        {
+            File.Move(tempPath, path);
+        }
+    }
+
+    private static void Quarantine(string puzzleID)
+    {
+        try
+        {
+            string path = Path.Combine(DirectoryPath, FileName(puzzleID));
+            if (!File.Exists(path)) return;
+
+            string badPath = path + ".bad";
+            if (File.Exists(badPath)) File.Delete(badPath);
+            File.Move(path, badPath);
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"SolutionStore: could not set aside unreadable file - {e.Message}");
+        }
     }
 
     private static bool EntryNamed(SavedSolutionFile file, string name)
@@ -181,17 +232,6 @@ public static class SolutionStore
         foreach (SavedSolution entry in file.entries)
         {
             if (entry.name == name) return true;
-        }
-        return false;
-    }
-
-    private static bool ContainsDuplicate(SavedSolutionFile file, SavedSolution candidate)
-    {
-        string candidateSignature = JsonUtility.ToJson(candidate.tiles) + JsonUtility.ToJson(candidate.instructions);
-        foreach (SavedSolution entry in file.entries)
-        {
-            string signature = JsonUtility.ToJson(entry.tiles) + JsonUtility.ToJson(entry.instructions);
-            if (signature == candidateSignature) return true;
         }
         return false;
     }

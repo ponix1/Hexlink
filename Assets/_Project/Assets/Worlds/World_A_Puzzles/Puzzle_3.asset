@@ -14,8 +14,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StandardPuzzleData
   puzzleID: WA-3
   puzzleTitle: A-3
-  targetScore: 345
-  availableNumbers: 030000000400000005000000
-  availableOperations: []
-  layout: 2
-  starRating: 3
+  layoutCells:
+  - coordinate:
+      q: 0
+      r: 1
+  - coordinate:
+      q: 0
+      r: 0
+  - coordinate:
+      q: -1
+      r: 0
+  - coordinate:
+      q: 0
+      r: -1
+  - coordinate:
+      q: 1
+      r: -1
+  - coordinate:
+      q: 1
+      r: 0
+  - coordinate:
+      q: -1
+      r: 1
+  targetScore: 40
+  availableNumbers: 04000000
+  disabledOperations: []
+  starRating: 1

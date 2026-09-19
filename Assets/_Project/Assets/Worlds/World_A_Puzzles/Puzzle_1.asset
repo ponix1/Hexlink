@@ -39,5 +39,4 @@ MonoBehaviour:
   targetScore: 123
   availableNumbers: 010000000200000003000000
   disabledOperations: []
-  layout: 2
-  starRating: 4
+  starRating: 3

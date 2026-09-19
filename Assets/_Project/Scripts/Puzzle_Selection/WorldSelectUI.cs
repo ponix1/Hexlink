@@ -17,6 +17,18 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
 
     void Start()
     {
+        GameContentRegistry registry = GameContentRegistry.Load();
+        if (registry != null && registry.worlds != null && registry.worlds.Count > 0)
+        {
+            worlds = registry.worlds;
+        }
+
+        if (worlds == null || worlds.Count == 0)
+        {
+            Debug.LogError("WorldSelectUI: no worlds found - run Hexlink/Sync World Content.");
+            return;
+        }
+
         BuildNavigation();
         UpdateDisplay();
     }

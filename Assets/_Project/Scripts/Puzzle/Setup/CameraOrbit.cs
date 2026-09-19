@@ -1,10 +1,14 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class CameraOrbit : MonoBehaviour
 {
     [SerializeField] private Vector3 boardCenter = Vector3.zero;
     [SerializeField] private KeyCode recenterKey = KeyCode.F;
     [SerializeField] private float screenShift = 0.3f;
+    [SerializeField] private float zoomSpeed = 8f;
+    [SerializeField] private float minDistance = 3f;
+    [SerializeField] private float maxDistance = 30f;
 
     private float currentHorizontalAngle;
     private float currentVerticalAngle;
@@ -38,6 +42,8 @@ public class CameraOrbit : MonoBehaviour
             transform.position = pos;
         }
 
+        Zoom();
+
         bool rightHeld = Input.GetMouseButton(1);
 
         if (rightHeld && Input.GetMouseButton(0))
@@ -56,6 +62,22 @@ public class CameraOrbit : MonoBehaviour
 
             transform.eulerAngles = new Vector3(currentVerticalAngle, currentHorizontalAngle, 0f);
         }
+    }
+
+    private void Zoom()
+    {
+        if (childCamera == null) return;
+
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Approximately(scroll, 0f)) return;
+
+        // Scrolling over UI panels (palette, info tab) should drive those, not the board.
+        if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+
+        Transform cameraTransform = childCamera.transform;
+        float distance = Vector3.Distance(transform.position, cameraTransform.position);
+        float target = Mathf.Clamp(distance - scroll * zoomSpeed, minDistance, maxDistance);
+        cameraTransform.position = transform.position - cameraTransform.forward * target;
     }
 
     private void Pan()

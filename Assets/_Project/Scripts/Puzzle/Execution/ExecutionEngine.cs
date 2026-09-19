@@ -17,13 +17,15 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private Slider speedSlider;
     [SerializeField] private TextMeshProUGUI speedLabel;
     [SerializeField] private TileInventoryUI inventoryUI;
+    [SerializeField] private InfoTabMetrics metricsDisplay;
+    [SerializeField] private InstructionAuthoringController authoringController;
     [SerializeField] private GameObject nodePrefab;
     [SerializeField] private GameObject tileLabelPrefab;
     [SerializeField] private float nodeHeightY = 0.59f;
     [SerializeField] private float moveDuration = 0.5f;
     [SerializeField] private float spawnDuration = 0.25f;
     [SerializeField] private float mergePulseDuration = 0.3f;
-    [SerializeField] private Color activeColumnColor = new Color(0.635f, 0.843f, 0.890f);
+    [SerializeField] private Color activeColumnColor = new Color(0.486f, 0.616f, 0.651f);
 
     private Dictionary<HexCoord, NumberCircle> circles = new Dictionary<HexCoord, NumberCircle>();
     private bool running;
@@ -63,6 +65,7 @@ public class ExecutionEngine : MonoBehaviour
     private void OnPlayClicked()
     {
         Deselect();
+        CancelPendingAuthoring();
         if (running)
         {
             ResetExecution();
@@ -76,6 +79,7 @@ public class ExecutionEngine : MonoBehaviour
     private void OnResetClicked()
     {
         Deselect();
+        CancelPendingAuthoring();
         ResetExecution();
     }
 
@@ -88,7 +92,16 @@ public class ExecutionEngine : MonoBehaviour
     private void OnStepClicked()
     {
         Deselect();
+        CancelPendingAuthoring();
         Step();
+    }
+
+    private void CancelPendingAuthoring()
+    {
+        if (authoringController != null)
+        {
+            authoringController.CancelPending();
+        }
     }
 
     private void Deselect()
@@ -239,13 +252,15 @@ public class ExecutionEngine : MonoBehaviour
             List<GridController.CellInstruction> instructions = gridController.GetColumnInstructions(column);
             if (instructions.Count == 0) continue;
 
+            // Highlight the column that is ABOUT to run before waiting on the step
+            // gate, so a paused player always sees which step they're on.
+            gridController.SetActiveColumn(column);
+
             while (paused && !stepQueued)
             {
                 yield return null;
             }
             stepQueued = false;
-
-            gridController.SetActiveColumn(column);
 
             // Commit phase: instructions may depend on each other (a move vacating the tile
             // an operation needs, a select creating a circle another instruction uses).
@@ -302,17 +317,21 @@ public class ExecutionEngine : MonoBehaviour
                 yield return All(routines);
             }
 
-            gridController.ClearActiveColumn();
+            // Keep the highlight on the column that just ran - the next step switches
+            // it, and ResetExecution clears it. Clearing here would leave a paused
+            // player with no indication of where the program is.
 
             if (won)
             {
                 yield return WinSequence();
+                gridController.ClearActiveColumn();
                 running = false;
                 UpdatePlayLabel();
                 yield break;
             }
         }
 
+        gridController.ClearActiveColumn();
         running = false;
         UpdatePlayLabel();
     }
@@ -325,7 +344,10 @@ public class ExecutionEngine : MonoBehaviour
             if (PuzzleSelection.SelectedPuzzle != null)
             {
                 PuzzleProgress.MarkComplete(PuzzleSelection.SelectedPuzzle.puzzleID);
-                SolutionStore.Save(PuzzleSelection.SelectedPuzzle, labelController.boardState, gridController);
+            }
+            if (metricsDisplay != null)
+            {
+                metricsDisplay.RecordWin();
             }
             yield return winningCircle.WinPulse(1.2f / speedMultiplier);
         }

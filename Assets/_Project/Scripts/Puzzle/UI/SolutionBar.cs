@@ -45,7 +45,6 @@ public static class SolutionBarSpawner
         CreateButton(bar.transform, "PrevButton", "\u2039", 34f).onClick.AddListener(() => bar.GetComponent<SolutionBarController>().Cycle(-1));
         GameObject label = CreateLabel(bar.transform, "SolutionLabel", "No solutions");
         CreateButton(bar.transform, "NextButton", "\u203A", 34f).onClick.AddListener(() => bar.GetComponent<SolutionBarController>().Cycle(1));
-        CreateButton(bar.transform, "SaveButton", "Save", 64f).onClick.AddListener(() => bar.GetComponent<SolutionBarController>().SaveCurrent());
 
         bar.AddComponent<SolutionBarController>();
     }
@@ -104,7 +103,10 @@ public class SolutionBarController : MonoBehaviour
     private TextMeshProUGUI label;
     private List<SavedSolution> entries = new List<SavedSolution>();
     private int index = -1;
-    private bool freshMode;
+    private bool suppressAutoSave;
+    private bool dirty;
+    private float saveQueuedAt = -1f;
+    private const float AutoSaveDelay = 1f;
 
     private IEnumerator Start()
     {
@@ -117,9 +119,67 @@ public class SolutionBarController : MonoBehaviour
         yield return null;
         yield return null;
         Refresh();
+        if (index < 0 && entries.Count > 0) index = entries.Count - 1;
+        UpdateLabel();
+
+        if (grid != null) grid.OnGridChanged += QueueAutoSave;
+        if (labelController != null) labelController.boardState.OnCellChanged += QueueAutoSave;
+    }
+
+    private void Update()
+    {
+        if (saveQueuedAt >= 0f && Time.time - saveQueuedAt >= AutoSaveDelay)
+        {
+            FlushAutoSave();
+        }
+    }
+
+    private void OnDisable()
+    {
+        FlushAutoSave();
+        if (grid != null) grid.OnGridChanged -= QueueAutoSave;
+        if (labelController != null) labelController.boardState.OnCellChanged -= QueueAutoSave;
     }
 
     private string PuzzleID => PuzzleSelection.SelectedPuzzle != null ? PuzzleSelection.SelectedPuzzle.puzzleID : null;
+
+    private void QueueAutoSave(HexCoord coord)
+    {
+        QueueAutoSave();
+    }
+
+    private void QueueAutoSave()
+    {
+        if (suppressAutoSave) return;
+        dirty = true;
+        saveQueuedAt = Time.time;
+    }
+
+    private void FlushAutoSave()
+    {
+        saveQueuedAt = -1f;
+        if (!dirty || PuzzleID == null || grid == null || labelController == null) return;
+
+        if (index >= 0)
+        {
+            SavedSolution capture = SolutionStore.Capture(PuzzleSelection.SelectedPuzzle, labelController.boardState, grid);
+            if (SolutionStore.UpdateEntry(PuzzleID, index, capture))
+            {
+                dirty = false;
+            }
+        }
+        else
+        {
+            SavedSolution saved = SolutionStore.Save(PuzzleSelection.SelectedPuzzle, labelController.boardState, grid);
+            if (saved != null)
+            {
+                entries = SolutionStore.LoadAll(PuzzleID);
+                index = entries.Count - 1;
+                dirty = false;
+            }
+        }
+        UpdateLabel();
+    }
 
     private void Refresh()
     {
@@ -131,9 +191,9 @@ public class SolutionBarController : MonoBehaviour
     private void UpdateLabel()
     {
         if (label == null) return;
-        if (freshMode)
+        if (index < 0)
         {
-            label.text = "New solution (unsaved)";
+            label.text = "New solution";
         }
         else if (entries.Count == 0)
         {
@@ -141,7 +201,6 @@ public class SolutionBarController : MonoBehaviour
         }
         else
         {
-            if (index < 0) index = entries.Count - 1;
             label.text = $"{entries[index].name}  ({index + 1}/{entries.Count})";
         }
     }
@@ -150,42 +209,43 @@ public class SolutionBarController : MonoBehaviour
     {
         if (grid == null) return;
 
-        freshMode = true;
+        FlushAutoSave();
+
+        suppressAutoSave = true;
         grid.ClearAll();
+        suppressAutoSave = false;
+
+        index = -1;
+        dirty = false;
         UpdateLabel();
     }
 
     public void Cycle(int direction)
     {
+        FlushAutoSave();
         Refresh();
         if (entries.Count == 0)
         {
+            index = -1;
             label.text = "No solutions";
             return;
         }
 
-        freshMode = false;
         if (index < 0 || index >= entries.Count) index = entries.Count - 1;
         index = (index + direction + entries.Count) % entries.Count;
         ApplyCurrent();
     }
 
-    public void SaveCurrent()
-    {
-        if (PuzzleID == null || grid == null || labelController == null) return;
-
-        SolutionStore.Save(PuzzleSelection.SelectedPuzzle, labelController.boardState, grid);
-        freshMode = false;
-        Refresh();
-        index = entries.Count - 1;
-        UpdateLabel();
-    }
-
     private void ApplyCurrent()
     {
         if (grid == null || index < 0 || index >= entries.Count) return;
+
+        suppressAutoSave = true;
         grid.ApplySolution(entries[index]);
-        Debug.Log($"SolutionBar: applied '{entries[index].name}' ({index + 1}/{entries.Count}).");
+        suppressAutoSave = false;
+
+        dirty = false;
         UpdateLabel();
+        Debug.Log($"SolutionBar: applied '{entries[index].name}' ({index + 1}/{entries.Count}).");
     }
 }
