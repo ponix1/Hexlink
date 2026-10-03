@@ -323,7 +323,7 @@ public class InfoTabBuilder
         stripRT.anchoredPosition = Vector2.zero;
         stripRT.sizeDelta = new Vector2(320f, 0f);
 
-        // --- MetricsPanel: live instruction/cycle/processor counts + personal bests,
+        // --- MetricsPanel: live instruction/cycle/processor counts,
         // pinned to the top of the strip (mirroring the Hide button's corner placement). ---
         GameObject metricsPanel = new GameObject("MetricsPanel", typeof(RectTransform), typeof(Image));
         metricsPanel.transform.SetParent(controlStrip.transform, false);
@@ -341,17 +341,8 @@ public class InfoTabBuilder
         liveMetricsRT.anchorMin = new Vector2(0f, 1f);
         liveMetricsRT.anchorMax = new Vector2(1f, 1f);
         liveMetricsRT.pivot = new Vector2(0.5f, 1f);
-        liveMetricsRT.anchoredPosition = new Vector2(0f, -5f);
+        liveMetricsRT.anchoredPosition = new Vector2(0f, -12f);
         liveMetricsRT.sizeDelta = new Vector2(-8f, 20f);
-
-        GameObject bestMetricsLabel = CreateTMP("BestLabel", metricsPanel.transform, "Best \u2014  \u00B7  \u2014  \u00B7  \u2014", 12, FontStyles.Normal);
-        bestMetricsLabel.GetComponent<TextMeshProUGUI>().color = TextGrayColor;
-        RectTransform bestMetricsRT = bestMetricsLabel.GetComponent<RectTransform>();
-        bestMetricsRT.anchorMin = new Vector2(0f, 1f);
-        bestMetricsRT.anchorMax = new Vector2(1f, 1f);
-        bestMetricsRT.pivot = new Vector2(0.5f, 1f);
-        bestMetricsRT.anchoredPosition = new Vector2(0f, -25f);
-        bestMetricsRT.sizeDelta = new Vector2(-8f, 18f);
 
         GameObject playButton = CreateStripButton(controlStrip.transform, "PlayButton", "Play", -56f, true);
         GameObject pauseButton = CreateStripButton(controlStrip.transform, "PauseButton", "Pause", -100f, false);
@@ -398,7 +389,6 @@ public class InfoTabBuilder
         SerializedObject metricsSO = new SerializedObject(metrics);
         metricsSO.FindProperty("gridController").objectReferenceValue = gridController;
         metricsSO.FindProperty("liveLabel").objectReferenceValue = liveMetricsLabel.GetComponent<TextMeshProUGUI>();
-        metricsSO.FindProperty("bestLabel").objectReferenceValue = bestMetricsLabel.GetComponent<TextMeshProUGUI>();
         metricsSO.ApplyModifiedProperties();
 
         InstructionAuthoringController authoring = infoTab.AddComponent<InstructionAuthoringController>();
@@ -428,7 +418,6 @@ public class InfoTabBuilder
         engineSO.FindProperty("speedSlider").objectReferenceValue = speedSlider.GetComponent<Slider>();
         engineSO.FindProperty("speedLabel").objectReferenceValue = speedLabel.GetComponent<TextMeshProUGUI>();
         engineSO.FindProperty("inventoryUI").objectReferenceValue = Object.FindFirstObjectByType<TileInventoryUI>();
-        engineSO.FindProperty("metricsDisplay").objectReferenceValue = metrics;
         engineSO.FindProperty("authoringController").objectReferenceValue = authoring;
         engineSO.FindProperty("nodePrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Node.prefab");
         SerializedObject labelControllerSO = new SerializedObject(labelController);

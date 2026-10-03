@@ -17,7 +17,6 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private Slider speedSlider;
     [SerializeField] private TextMeshProUGUI speedLabel;
     [SerializeField] private TileInventoryUI inventoryUI;
-    [SerializeField] private InfoTabMetrics metricsDisplay;
     [SerializeField] private InstructionAuthoringController authoringController;
     [SerializeField] private GameObject nodePrefab;
     [SerializeField] private GameObject tileLabelPrefab;
@@ -341,15 +340,28 @@ public class ExecutionEngine : MonoBehaviour
         if (winningCircle != null)
         {
             Debug.Log($"Puzzle solved! {winningCircle.Value} reached the target tile.");
-            if (PuzzleSelection.SelectedPuzzle != null)
+
+            string puzzleId = PuzzleSelection.SelectedPuzzle?.puzzleID;
+            if (!string.IsNullOrEmpty(puzzleId))
             {
-                PuzzleProgress.MarkComplete(PuzzleSelection.SelectedPuzzle.puzzleID);
+                PuzzleProgress.MarkComplete(puzzleId);
             }
-            if (metricsDisplay != null)
+
+            PuzzleRecords.Result result = default;
+            bool recorded = false;
+            if (!string.IsNullOrEmpty(puzzleId) && gridController != null)
             {
-                metricsDisplay.RecordWin();
+                gridController.GetMetrics(out int instructions, out int cycles, out int processors);
+                result = PuzzleRecords.Submit(puzzleId, instructions, cycles, processors);
+                recorded = true;
             }
+
             yield return winningCircle.WinPulse(1.2f / speedMultiplier);
+
+            if (recorded)
+            {
+                WinPopup.Show(result);
+            }
         }
     }
 

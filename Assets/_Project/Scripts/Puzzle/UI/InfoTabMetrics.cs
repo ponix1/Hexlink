@@ -5,7 +5,6 @@ public class InfoTabMetrics : MonoBehaviour
 {
     [SerializeField] private GridController gridController;
     [SerializeField] private TextMeshProUGUI liveLabel;
-    [SerializeField] private TextMeshProUGUI bestLabel;
 
     private void Start()
     {
@@ -14,7 +13,12 @@ public class InfoTabMetrics : MonoBehaviour
             gridController.OnGridChanged += Refresh;
         }
         Refresh();
-        RefreshBests();
+
+        Transform stale = FindDeep(transform, "BestLabel");
+        if (stale != null)
+        {
+            Destroy(stale.gameObject);
+        }
     }
 
     private void OnDestroy()
@@ -33,31 +37,14 @@ public class InfoTabMetrics : MonoBehaviour
         liveLabel.text = $"Instr {instructions}  \u00B7  Cycles {cycles}  \u00B7  Procs {processors}";
     }
 
-    public void RecordWin()
+    private static Transform FindDeep(Transform parent, string name)
     {
-        if (gridController == null || PuzzleSelection.SelectedPuzzle == null) return;
-
-        gridController.GetMetrics(out int instructions, out int cycles, out int processors);
-        PuzzleRecords.Submit(PuzzleSelection.SelectedPuzzle.puzzleID, instructions, cycles, processors);
-        RefreshBests();
-    }
-
-    private void RefreshBests()
-    {
-        if (bestLabel == null) return;
-
-        if (PuzzleSelection.SelectedPuzzle == null)
+        foreach (Transform child in parent)
         {
-            bestLabel.text = "";
-            return;
+            if (child.name == name) return child;
+            Transform result = FindDeep(child, name);
+            if (result != null) return result;
         }
-
-        PuzzleRecords.TryGet(PuzzleSelection.SelectedPuzzle.puzzleID, out int instructions, out int cycles, out int processors);
-        bestLabel.text = $"Best {Format(instructions)}  \u00B7  {Format(cycles)}  \u00B7  {Format(processors)}";
-    }
-
-    private static string Format(int value)
-    {
-        return value == int.MaxValue ? "\u2014" : value.ToString();
+        return null;
     }
 }
