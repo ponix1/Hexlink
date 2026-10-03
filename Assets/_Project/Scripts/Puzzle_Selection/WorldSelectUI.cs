@@ -71,15 +71,10 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         GameObject button = new GameObject("NavButton_" + label, typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(transform, false);
         Image image = button.GetComponent<Image>();
-        image.color = new Color(0.23f, 0.23f, 0.27f);
+        image.color = HexlinkTheme.Ghost;
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
-        buttonComponent.transition = Button.Transition.ColorTint;
-        ColorBlock colors = buttonComponent.colors;
-        colors.highlightedColor = new Color(0.55f, 0.55f, 0.62f);
-        colors.pressedColor = new Color(0.3f, 0.3f, 0.35f);
-        colors.selectedColor = new Color(0.55f, 0.55f, 0.62f);
-        buttonComponent.colors = colors;
+        HexlinkTheme.ApplyHoverTint(buttonComponent);
 
         RectTransform rt = button.GetComponent<RectTransform>();
         rt.anchorMin = anchor;
@@ -94,7 +89,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         tmp.text = label;
         tmp.fontSize = 24;
         tmp.fontStyle = FontStyles.Bold;
-        tmp.color = new Color(0.91f, 0.91f, 0.91f);
+        tmp.color = HexlinkTheme.TextLight;
         tmp.alignment = TextAlignmentOptions.Center;
         RectTransform textRT = text.GetComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero;

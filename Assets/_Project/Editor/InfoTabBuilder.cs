@@ -14,21 +14,23 @@ public class InfoTabBuilder
     private static float CellWidth = 136f;
     private static float CellHeight = 74f;
 
-    private static readonly Color BorderColor = new Color(0.071f, 0.075f, 0.090f);
-    private static readonly Color PanelColor = new Color(0.118f, 0.125f, 0.149f);
-    private static readonly Color StripColor = new Color(0.138f, 0.145f, 0.184f);
-    private static readonly Color CellFrameColor = new Color(0.106f, 0.114f, 0.137f);
-    private static readonly Color CellFillColor = new Color(0.165f, 0.176f, 0.204f);
-    private static readonly Color DividerColor = new Color(0.227f, 0.247f, 0.278f);
-    private static readonly Color TextLightColor = new Color(0.910f, 0.918f, 0.929f);
-    private static readonly Color ChipTextColor = new Color(0.961f, 0.965f, 0.973f);
-    private static readonly Color TextGrayColor = new Color(0.604f, 0.627f, 0.667f);
-    private static readonly Color AccentColor    = new Color(0.486f, 0.616f, 0.651f);
-    private static readonly Color GhostButtonColor = new Color(0.165f, 0.176f, 0.204f);
+    private static readonly Color BorderColor = HexlinkTheme.Border;
+    private static readonly Color PanelColor = HexlinkTheme.Panel;
+    private static readonly Color StripColor = HexlinkTheme.Strip;
+    private static readonly Color CellFrameColor = HexlinkTheme.CellFrame;
+    private static readonly Color CellFillColor = HexlinkTheme.CellFill;
+    private static readonly Color DividerColor = HexlinkTheme.Divider;
+    private static readonly Color TextLightColor = HexlinkTheme.TextLight;
+    private static readonly Color ChipTextColor = HexlinkTheme.ChipText;
+    private static readonly Color TextGrayColor = HexlinkTheme.TextGray;
+    private static readonly Color AccentColor    = HexlinkTheme.Accent;
+    private static readonly Color GhostButtonColor = HexlinkTheme.Ghost;
 
     [MenuItem("Hexlink/Build Info Tab")]
     public static void Build()
     {
+        Selection.activeObject = null;
+
         Canvas canvas = Object.FindFirstObjectByType<Canvas>();
         if (canvas == null)
         {
@@ -327,7 +329,7 @@ public class InfoTabBuilder
         // pinned to the top of the strip (mirroring the Hide button's corner placement). ---
         GameObject metricsPanel = new GameObject("MetricsPanel", typeof(RectTransform), typeof(Image));
         metricsPanel.transform.SetParent(controlStrip.transform, false);
-        metricsPanel.GetComponent<Image>().color = new Color(0.125f, 0.133f, 0.165f);
+        metricsPanel.GetComponent<Image>().color = HexlinkTheme.Panel;
         RectTransform metricsRT = metricsPanel.GetComponent<RectTransform>();
         metricsRT.anchorMin = new Vector2(0.5f, 1f);
         metricsRT.anchorMax = new Vector2(0.5f, 1f);
@@ -456,14 +458,7 @@ public class InfoTabBuilder
 
     private static void ApplyHoverTint(Button button)
     {
-        ColorBlock colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(1.18f, 1.18f, 1.18f);
-        colors.pressedColor = new Color(0.84f, 0.84f, 0.84f);
-        colors.selectedColor = Color.white;
-        colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.5f);
-        colors.fadeDuration = 0.08f;
-        button.colors = colors;
+        HexlinkTheme.ApplyHoverTint(button);
     }
 
     private static GameObject CreateSlider(Transform parent)

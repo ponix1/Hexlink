@@ -24,7 +24,7 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private float moveDuration = 0.5f;
     [SerializeField] private float spawnDuration = 0.25f;
     [SerializeField] private float mergePulseDuration = 0.3f;
-    [SerializeField] private Color activeColumnColor = new Color(0.486f, 0.616f, 0.651f);
+    [SerializeField] private Color activeColumnColor = new Color(0.580f, 0.740f, 0.780f);
 
     private Dictionary<HexCoord, NumberCircle> circles = new Dictionary<HexCoord, NumberCircle>();
     private bool running;
@@ -354,6 +354,12 @@ public class ExecutionEngine : MonoBehaviour
                 gridController.GetMetrics(out int instructions, out int cycles, out int processors);
                 result = PuzzleRecords.Submit(puzzleId, instructions, cycles, processors);
                 recorded = true;
+
+                SolutionSession session = FindFirstObjectByType<SolutionSession>();
+                if (session != null)
+                {
+                    session.MarkCurrentSolved();
+                }
             }
 
             yield return winningCircle.WinPulse(1.2f / speedMultiplier);

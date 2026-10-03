@@ -15,6 +15,8 @@ public class TilePaletteBuilder
     [MenuItem("Hexlink/Build Tile Palette")]
     public static void Build()
     {
+        Selection.activeObject = null;
+
         Canvas canvas = Object.FindFirstObjectByType<Canvas>();
         if (canvas == null)
         {
@@ -53,7 +55,7 @@ public class TilePaletteBuilder
         // --- TilePalette root: black border layer, anchored top-left, inset from the edge. ---
         GameObject palette = new GameObject("TilePalette", typeof(RectTransform), typeof(Image));
         palette.transform.SetParent(canvas.transform, false);
-        palette.GetComponent<Image>().color = Color.black;
+        palette.GetComponent<Image>().color = HexlinkTheme.Border;
         RectTransform paletteRT = palette.GetComponent<RectTransform>();
         paletteRT.anchorMin = savedAnchorMin;
         paletteRT.anchorMax = savedAnchorMax;
@@ -64,7 +66,7 @@ public class TilePaletteBuilder
         // --- Inner white panel (border effect, matching InfoTab style). ---
         GameObject inner = new GameObject("Panel", typeof(RectTransform), typeof(Image));
         inner.transform.SetParent(palette.transform, false);
-        inner.GetComponent<Image>().color = Color.white;
+        inner.GetComponent<Image>().color = HexlinkTheme.Panel;
         RectTransform innerRT = inner.GetComponent<RectTransform>();
         innerRT.anchorMin = Vector2.zero;
         innerRT.anchorMax = Vector2.one;
@@ -75,9 +77,10 @@ public class TilePaletteBuilder
         GameObject collapseButton = new GameObject("CollapseButton", typeof(RectTransform), typeof(Image), typeof(Button));
         collapseButton.transform.SetParent(palette.transform, false);
         Image collapseImage = collapseButton.GetComponent<Image>();
-        collapseImage.color = Color.white;
+        collapseImage.color = HexlinkTheme.Ghost;
         Button collapseBtn = collapseButton.GetComponent<Button>();
         collapseBtn.targetGraphic = collapseImage;
+        HexlinkTheme.ApplyHoverTint(collapseBtn);
         RectTransform collapseRT = collapseButton.GetComponent<RectTransform>();
         collapseRT.anchorMin = new Vector2(0f, 1f);
         collapseRT.anchorMax = new Vector2(0f, 1f);
@@ -85,6 +88,7 @@ public class TilePaletteBuilder
         collapseRT.anchoredPosition = new Vector2(6f, 24f);
         collapseRT.sizeDelta = new Vector2(90f, 22f);
         GameObject collapseText = CreateTMP("Label", collapseButton.transform, "Hide", 13, FontStyles.Bold);
+        collapseText.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.TextLight;
         StretchFull(collapseText.GetComponent<RectTransform>());
 
         // --- PaletteScroll: vertical-only scroll area, below the collapse strip. ---
@@ -139,6 +143,7 @@ public class TilePaletteBuilder
 
         // --- SelectedText: shows the current palette pick, pinned to the panel bottom. ---
         GameObject selectedText = CreateTMP("SelectedText", inner.transform, "Selected: none", 12, FontStyles.Normal);
+        selectedText.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.TextGray;
         RectTransform selectedRT = selectedText.GetComponent<RectTransform>();
         selectedRT.anchorMin = new Vector2(0f, 0f);
         selectedRT.anchorMax = new Vector2(1f, 0f);
@@ -184,6 +189,7 @@ public class TilePaletteBuilder
         sectionVLG.spacing = 4f;
 
         GameObject sectionLabel = CreateTMP("SectionLabel", section.transform, title, 13, FontStyles.Bold);
+        sectionLabel.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.TextLight;
         sectionLabel.GetComponent<RectTransform>().sizeDelta = new Vector2(innerWidth, LabelHeight);
 
         GameObject grid = new GameObject("Grid", typeof(RectTransform), typeof(GridLayoutGroup));
@@ -206,10 +212,22 @@ public class TilePaletteBuilder
         GameObject button = new GameObject("Tile_" + display, typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(parent, false);
         Image image = button.GetComponent<Image>();
-        image.color = Color.white;
+        image.color = HexlinkTheme.CellFrame;
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
+        HexlinkTheme.ApplyHoverTint(buttonComponent);
+
+        GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+        fill.transform.SetParent(button.transform, false);
+        fill.GetComponent<Image>().color = HexlinkTheme.CellFill;
+        RectTransform fillRT = fill.GetComponent<RectTransform>();
+        fillRT.anchorMin = Vector2.zero;
+        fillRT.anchorMax = Vector2.one;
+        fillRT.offsetMin = new Vector2(2f, 2f);
+        fillRT.offsetMax = new Vector2(-2f, -2f);
+
         GameObject label = CreateTMP("Label", button.transform, display, 16, FontStyles.Bold);
+        label.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.ChipText;
         StretchFull(label.GetComponent<RectTransform>());
 
         // Persistent listener so it survives scene save; runtime AddListener would not.

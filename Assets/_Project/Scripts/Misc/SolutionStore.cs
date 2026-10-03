@@ -41,6 +41,7 @@ public class SavedSolution
     public string name;
     public string timestamp;
     public string puzzleID;
+    public bool solved;
     public int processors;
     public int columns;
     public List<SavedTile> tiles = new List<SavedTile>();
@@ -55,6 +56,11 @@ public class SavedSolutionFile
 
 public static class SolutionStore
 {
+    public const int PendingNone = -2;
+    public const int PendingNew = -1;
+
+    public static int PendingIndex = PendingNone;
+
     private static string DirectoryPath => Path.Combine(Application.persistentDataPath, "solutions");
 
     public static SavedSolution Save(PuzzleData puzzle, BoardState board, GridController grid, string name = null)
@@ -101,6 +107,7 @@ public static class SolutionStore
             if (index < 0 || index >= file.entries.Count) return false;
 
             solution.name = file.entries[index].name;
+            solution.solved = file.entries[index].solved;
             solution.timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
             file.entries[index] = solution;
             WriteFile(puzzleID, file);
@@ -111,6 +118,103 @@ public static class SolutionStore
             Debug.LogWarning($"SolutionStore: failed to update solution - {e.Message}");
             return false;
         }
+    }
+
+    public static bool Rename(string puzzleID, int index, string newName)
+    {
+        if (string.IsNullOrEmpty(puzzleID) || string.IsNullOrWhiteSpace(newName)) return false;
+
+        try
+        {
+            SavedSolutionFile file = LoadFile(puzzleID);
+            if (index < 0 || index >= file.entries.Count) return false;
+
+            string name = newName.Trim();
+            if (name.Length == 0) return false;
+            for (int i = 0; i < file.entries.Count; i++)
+            {
+                if (i != index && file.entries[i].name == name) return false;
+            }
+
+            file.entries[index].name = name;
+            file.entries[index].timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+            WriteFile(puzzleID, file);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"SolutionStore: failed to rename solution - {e.Message}");
+            return false;
+        }
+    }
+
+    public static bool Delete(string puzzleID, int index)
+    {
+        if (string.IsNullOrEmpty(puzzleID)) return false;
+
+        try
+        {
+            SavedSolutionFile file = LoadFile(puzzleID);
+            if (index < 0 || index >= file.entries.Count) return false;
+
+            file.entries.RemoveAt(index);
+            WriteFile(puzzleID, file);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"SolutionStore: failed to delete solution - {e.Message}");
+            return false;
+        }
+    }
+
+    public static bool MarkSolved(string puzzleID, int index)
+    {
+        if (string.IsNullOrEmpty(puzzleID)) return false;
+
+        try
+        {
+            SavedSolutionFile file = LoadFile(puzzleID);
+            if (index < 0 || index >= file.entries.Count) return false;
+            if (file.entries[index].solved) return true;
+
+            file.entries[index].solved = true;
+            WriteFile(puzzleID, file);
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"SolutionStore: failed to mark solution solved - {e.Message}");
+            return false;
+        }
+    }
+
+    public static void ComputeMetrics(SavedSolution solution, out int instructions, out int cycles, out int processors, out int sum)
+    {
+        instructions = 0;
+        cycles = 0;
+        processors = 0;
+
+        if (solution == null || solution.instructions == null)
+        {
+            sum = 0;
+            return;
+        }
+
+        HashSet<int> usedProcessors = new HashSet<int>();
+        int maxColumn = -1;
+        foreach (SavedInstruction saved in solution.instructions)
+        {
+            if (string.IsNullOrEmpty(saved.type)) continue;
+
+            instructions++;
+            usedProcessors.Add(saved.processor);
+            if (saved.column > maxColumn) maxColumn = saved.column;
+        }
+
+        cycles = maxColumn + 1;
+        processors = usedProcessors.Count;
+        sum = instructions + cycles + processors;
     }
 
     public static List<SavedSolution> LoadAll(string puzzleID)

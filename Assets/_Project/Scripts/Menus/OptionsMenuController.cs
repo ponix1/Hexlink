@@ -91,7 +91,7 @@ public class OptionsMenuController : MonoBehaviour
         void Apply(bool v)
         {
             if (knob != null) knob.anchoredPosition = new Vector2(v ? 12f : -12f, 0f);
-            if (track != null) track.color = v ? new Color(0.36f, 0.63f, 0.94f) : new Color(0.35f, 0.35f, 0.41f);
+            if (track != null) track.color = v ? HexlinkTheme.Accent : HexlinkTheme.CellFill;
         }
 
         toggle.transition = Toggle.Transition.None;

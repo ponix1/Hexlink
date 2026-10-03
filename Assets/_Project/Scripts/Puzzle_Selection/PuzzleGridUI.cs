@@ -50,5 +50,41 @@ public class PuzzleGridUI : MonoBehaviour
         {
             scrollRect.scrollSensitivity = 60f;
         }
+
+        RefreshGridLayout();
+    }
+
+    private void RefreshGridLayout()
+    {
+        if (contentParent == null) return;
+        RectTransform contentRT = contentParent as RectTransform;
+        GridLayoutGroup grid = contentRT != null ? contentRT.GetComponent<GridLayoutGroup>() : null;
+        ScrollRect scrollRect = GetComponentInParent<ScrollRect>();
+        if (contentRT == null || grid == null || scrollRect == null || scrollRect.viewport == null) return;
+
+        contentRT.anchorMin = new Vector2(0f, 1f);
+        contentRT.anchorMax = new Vector2(1f, 1f);
+        contentRT.pivot = new Vector2(0.5f, 1f);
+        contentRT.anchoredPosition = Vector2.zero;
+        contentRT.sizeDelta = new Vector2(0f, contentRT.sizeDelta.y);
+        grid.childAlignment = TextAnchor.UpperCenter;
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.viewport);
+
+        const float targetCardWidth = 340f;
+        const float cardAspect = 232f / 340f;
+        float available = scrollRect.viewport.rect.width - grid.padding.horizontal;
+
+        int columns = Mathf.Max(1, Mathf.RoundToInt(available / targetCardWidth));
+        float cardWidth = (available - (columns - 1) * grid.spacing.x) / columns;
+        if (cardWidth > targetCardWidth * 1.25f)
+        {
+            columns++;
+            cardWidth = (available - (columns - 1) * grid.spacing.x) / columns;
+        }
+        cardWidth = Mathf.Min(cardWidth, targetCardWidth * 1.25f);
+
+        grid.cellSize = new Vector2(cardWidth, cardWidth * cardAspect);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(contentRT);
     }
 }

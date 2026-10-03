@@ -10,13 +10,11 @@ public static class OptionsScreenFactory
     private const float RowHeight = 36f;
     private const float LabelWidth = 220f;
 
-    private static readonly Color BorderColor = new Color(0.29f, 0.29f, 0.33f);
-    private static readonly Color PanelColor = new Color(0.14f, 0.14f, 0.16f);
-    private static readonly Color ControlColor = new Color(0.23f, 0.23f, 0.27f);
-    private static readonly Color ControlHighlight = new Color(0.55f, 0.55f, 0.62f);
-    private static readonly Color ControlPressed = new Color(0.3f, 0.3f, 0.35f);
-    private static readonly Color TextColor = new Color(0.91f, 0.91f, 0.91f);
-    private static readonly Color MutedTextColor = new Color(0.6f, 0.6f, 0.65f);
+    private static readonly Color BorderColor = HexlinkTheme.Border;
+    private static readonly Color PanelColor = HexlinkTheme.Panel;
+    private static readonly Color ControlColor = HexlinkTheme.Ghost;
+    private static readonly Color TextColor = HexlinkTheme.TextLight;
+    private static readonly Color MutedTextColor = HexlinkTheme.TextGray;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoSpawn()
@@ -46,7 +44,7 @@ public static class OptionsScreenFactory
     {
         GameObject screen = new GameObject("OptionsScreen", typeof(RectTransform), typeof(Image));
         screen.transform.SetParent(canvas.transform, false);
-        screen.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.65f);
+        screen.GetComponent<Image>().color = HexlinkTheme.BackdropDim;
         RectTransform screenRT = screen.GetComponent<RectTransform>();
         screenRT.anchorMin = Vector2.zero;
         screenRT.anchorMax = Vector2.one;
@@ -192,7 +190,7 @@ public static class OptionsScreenFactory
 
         GameObject toggle = new GameObject("Toggle", typeof(RectTransform), typeof(Image), typeof(Toggle));
         toggle.transform.SetParent(row.transform, false);
-        toggle.GetComponent<Image>().color = new Color(0.35f, 0.35f, 0.41f);
+        toggle.GetComponent<Image>().color = HexlinkTheme.CellFill;
         toggle.AddComponent<LayoutElement>().preferredWidth = 52f;
         Toggle toggleComponent = toggle.GetComponent<Toggle>();
         toggleComponent.transition = Toggle.Transition.None;
@@ -232,7 +230,7 @@ public static class OptionsScreenFactory
     {
         GameObject box = new GameObject("Value", typeof(RectTransform), typeof(Image));
         box.transform.SetParent(row.transform, false);
-        box.GetComponent<Image>().color = new Color(0.08f, 0.08f, 0.1f);
+        box.GetComponent<Image>().color = HexlinkTheme.CellFrame;
         LayoutElement boxLE = box.AddComponent<LayoutElement>();
         boxLE.preferredWidth = 70f;
         boxLE.preferredHeight = 30f;
@@ -250,11 +248,7 @@ public static class OptionsScreenFactory
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
         buttonComponent.transition = Button.Transition.ColorTint;
-        ColorBlock colors = buttonComponent.colors;
-        colors.highlightedColor = ControlHighlight;
-        colors.pressedColor = ControlPressed;
-        colors.selectedColor = ControlHighlight;
-        buttonComponent.colors = colors;
+        HexlinkTheme.ApplyHoverTint(buttonComponent);
         LayoutElement le = button.AddComponent<LayoutElement>();
         le.preferredWidth = width;
         le.preferredHeight = height;

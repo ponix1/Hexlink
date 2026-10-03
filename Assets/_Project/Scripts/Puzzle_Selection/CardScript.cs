@@ -27,7 +27,7 @@ public class PuzzleCardView : MonoBehaviour, IPointerEnterHandler
 
         bool complete = PuzzleProgress.IsComplete(data.puzzleID);
         puzzleNameText.text = (complete ? "\u2713 " : "") + data.puzzleTitle;
-        puzzleNameText.color = complete ? new Color(0.25f, 0.7f, 0.4f) : Color.black;
+        puzzleNameText.color = complete ? new Color(0.30f, 0.78f, 0.47f) : HexlinkTheme.TextLight;
         targetNumText.text = data.GetDisplayTarget();
 
         if (data is StandardPuzzleData standardData)
@@ -50,7 +50,17 @@ public class PuzzleCardView : MonoBehaviour, IPointerEnterHandler
     private void OnCardClicked()
     {
         PuzzleSelection.SelectedPuzzle = currentData;
-        SceneManager.LoadScene(puzzleSceneName);
+        SolutionPickerPopup.Show(currentData,
+            index =>
+            {
+                SolutionStore.PendingIndex = index;
+                SceneManager.LoadScene(puzzleSceneName);
+            },
+            () =>
+            {
+                SolutionStore.PendingIndex = SolutionStore.PendingNew;
+                SceneManager.LoadScene(puzzleSceneName);
+            });
     }
 
     public void OnPointerEnter(PointerEventData eventData)

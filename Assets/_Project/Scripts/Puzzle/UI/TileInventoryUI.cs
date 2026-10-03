@@ -82,7 +82,7 @@ public class TileInventoryUI : MonoBehaviour
 
             bool available = IsTileAvailable(NormalizeSymbol(label.text));
             button.interactable = available;
-            label.color = available ? Color.black : new Color(0.55f, 0.55f, 0.55f);
+            label.color = available ? HexlinkTheme.ChipText : HexlinkTheme.TextGray;
         }
     }
 

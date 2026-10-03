@@ -35,7 +35,7 @@ public static class GridContextMenu
 
         GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
         panel.transform.SetParent(root.transform, false);
-        panel.GetComponent<Image>().color = new Color(0.106f, 0.114f, 0.137f);
+        panel.GetComponent<Image>().color = HexlinkTheme.CellFrame;
         RectTransform panelRT = panel.GetComponent<RectTransform>();
 
         Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
@@ -54,7 +54,7 @@ public static class GridContextMenu
 
         GameObject inner = new GameObject("Inner", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
         inner.transform.SetParent(panel.transform, false);
-        inner.GetComponent<Image>().color = new Color(0.165f, 0.176f, 0.204f);
+        inner.GetComponent<Image>().color = HexlinkTheme.CellFill;
         RectTransform innerRT = inner.GetComponent<RectTransform>();
         innerRT.anchorMin = Vector2.zero;
         innerRT.anchorMax = Vector2.one;
@@ -91,8 +91,8 @@ public static class GridContextMenu
     {
         GameObject button = new GameObject("Entry_" + label, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
         button.transform.SetParent(parent, false);
-        Image image = button.GetComponent<Image>();
-        image.color = new Color(0.208f, 0.220f, 0.247f);
+            Image image = button.GetComponent<Image>();
+            image.color = HexlinkTheme.Ghost;
         button.GetComponent<LayoutElement>().preferredHeight = 24f;
 
         Button buttonComponent = button.GetComponent<Button>();
@@ -108,8 +108,8 @@ public static class GridContextMenu
         text.transform.SetParent(button.transform, false);
         TextMeshProUGUI tmp = text.GetComponent<TextMeshProUGUI>();
         tmp.text = label;
-        tmp.fontSize = 13;
-        tmp.color = new Color(0.910f, 0.918f, 0.929f);
+            tmp.fontSize = 13;
+            tmp.color = HexlinkTheme.TextLight;
         tmp.alignment = TextAlignmentOptions.Midline;
         RectTransform textRT = text.GetComponent<RectTransform>();
         StretchFull(textRT);

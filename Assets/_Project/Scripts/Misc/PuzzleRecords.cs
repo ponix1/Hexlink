@@ -41,6 +41,14 @@ public static class PuzzleRecords
         }
     }
 
+    public static void TryGet(string puzzleId, out int instructions, out int cycles, out int processors, out int sum)
+    {
+        instructions = PlayerPrefs.GetInt(Key(puzzleId, "Instr"), Unset);
+        cycles = PlayerPrefs.GetInt(Key(puzzleId, "Cycles"), Unset);
+        processors = PlayerPrefs.GetInt(Key(puzzleId, "Procs"), Unset);
+        sum = PlayerPrefs.GetInt(Key(puzzleId, "Sum"), Unset);
+    }
+
     public static Result Submit(string puzzleId, int instructions, int cycles, int processors)
     {
         int sum = instructions + cycles + processors;

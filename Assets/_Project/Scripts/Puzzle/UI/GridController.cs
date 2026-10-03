@@ -19,24 +19,24 @@ public class GridController : MonoBehaviour
     [SerializeField] private GameObject arrowTokenTemplate;
     [SerializeField] private Button collapseButton;
 
-    private static readonly Color ChipSubjectColor = new Color(0.290f, 0.318f, 0.361f);
-    private static readonly Color ChipOperationColor = new Color(0.227f, 0.353f, 0.400f);
-    private static readonly Color ChipOperandColor = new Color(0.325f, 0.353f, 0.404f);
+    private static readonly Color ChipSubjectColor = new Color(0.384f, 0.412f, 0.463f);
+    private static readonly Color ChipOperationColor = new Color(0.322f, 0.459f, 0.510f);
+    private static readonly Color ChipOperandColor = new Color(0.424f, 0.459f, 0.510f);
     private const int TokensPerRow = 4;
 
-    private Color selectedFrame = new Color(0.486f, 0.616f, 0.651f);
-    private Color selectedFill = new Color(0.110f, 0.169f, 0.188f);
-    private Color errorFrame = new Color(0.690f, 0.439f, 0.439f);
-    private Color errorFill = new Color(0.227f, 0.133f, 0.133f);
+    private Color selectedFrame = HexlinkTheme.Accent;
+    private Color selectedFill = new Color(0.230f, 0.302f, 0.322f);
+    private Color errorFrame = new Color(0.780f, 0.490f, 0.490f);
+    private Color errorFill = new Color(0.373f, 0.220f, 0.220f);
     private Color pendingFrame = new Color(0.980f, 0.780f, 0.320f);
-    private Color pendingFill = new Color(0.545f, 0.420f, 0.160f);
-    private Color normalFrame = new Color(0.106f, 0.114f, 0.137f);
-    private Color normalFill = new Color(0.165f, 0.176f, 0.204f);
-    private Color normalFillOdd = new Color(0.192f, 0.212f, 0.247f);
-    private Color hoverFill = new Color(0.204f, 0.220f, 0.247f);
-    private Color hoverFillOdd = new Color(0.227f, 0.243f, 0.271f);
-    private Color runningFill = new Color(0.165f, 0.227f, 0.251f);
-    private Color headerTextColor = new Color(0.604f, 0.627f, 0.667f);
+    private Color pendingFill = new Color(0.573f, 0.439f, 0.173f);
+    private Color normalFrame = HexlinkTheme.CellFrame;
+    private Color normalFill = HexlinkTheme.CellFill;
+    private Color normalFillOdd = new Color(0.318f, 0.333f, 0.388f);
+    private Color hoverFill = new Color(0.353f, 0.369f, 0.424f);
+    private Color hoverFillOdd = new Color(0.380f, 0.396f, 0.451f);
+    private Color runningFill = new Color(0.294f, 0.365f, 0.392f);
+    private Color headerTextColor = HexlinkTheme.TextGray;
 
     private HexCoord? pendingChangeCoord;
 
@@ -167,11 +167,11 @@ public class GridController : MonoBehaviour
         if (GameOptions.ColourBlindMode)
         {
             selectedFrame = new Color(0.561f, 0.651f, 0.788f);
-            selectedFill = new Color(0.118f, 0.153f, 0.208f);
+            selectedFill = new Color(0.231f, 0.267f, 0.322f);
             errorFrame = new Color(0.753f, 0.541f, 0.333f);
-            errorFill = new Color(0.208f, 0.153f, 0.094f);
+            errorFill = new Color(0.322f, 0.267f, 0.208f);
             pendingFrame = new Color(0.720f, 0.620f, 0.950f);
-            pendingFill = new Color(0.330f, 0.270f, 0.490f);
+            pendingFill = new Color(0.443f, 0.384f, 0.604f);
         }
 
         if (collapseButton != null)
