@@ -18,6 +18,10 @@ public class InstructionAuthoringController : MonoBehaviour
 
     public bool IsBusy => state != State.Idle;
 
+    // Tutorial read access: true after C was pressed and the operator tile
+    // was picked - i.e. the operand selection stage.
+    public bool IsAwaitingOperands => state == State.AwaitingOperands;
+
     public GridController GridController => gridController;
 
     public void CancelPending()
@@ -49,6 +53,7 @@ public class InstructionAuthoringController : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Return))
         {
+            if (TutorialGate.Active && !TutorialGate.AllowProcessorKey) return;
             gridController.AddProcessorRow();
             return;
         }
@@ -65,16 +70,19 @@ public class InstructionAuthoringController : MonoBehaviour
             case State.SubjectSelected:
                 if (Input.GetKeyDown(KeyCode.Z))
                 {
+                    if (TutorialGate.Active && !TutorialGate.AllowMoveKey) return;
                     state = State.AwaitingMoveTarget;
                     if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, tileSelector.GetExistingNeighbors(subject));
                 }
                 else if (Input.GetKeyDown(KeyCode.C))
                 {
+                    if (TutorialGate.Active && !TutorialGate.AllowOperationKey) return;
                     state = State.AwaitingOperationTile;
                     if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, tileSelector.GetAdjacentOperationTiles(subject));
                 }
                 else if (Input.GetKeyDown(KeyCode.Space))
                 {
+                    if (TutorialGate.Active && !TutorialGate.AllowSpaceKey) return;
                     if (labelController.boardState.GetTile(subject) is NumberTileData)
                     {
                         gridController.PlaceInstruction(gridController.SelectedProcessor, gridController.SelectedColumn,
@@ -90,7 +98,11 @@ public class InstructionAuthoringController : MonoBehaviour
 
             case State.AwaitingMoveTarget:
             case State.AwaitingOperands:
-                if (Input.GetKeyDown(KeyCode.D)) CommitPending();
+                if (Input.GetKeyDown(KeyCode.D))
+                {
+                    if (TutorialGate.Active && !TutorialGate.AllowCommitKey) return;
+                    CommitPending();
+                }
                 break;
         }
     }

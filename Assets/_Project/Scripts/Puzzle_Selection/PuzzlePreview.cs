@@ -26,7 +26,7 @@ public static class PuzzlePreview
     {
         if (SceneManager.GetActiveScene().name != SceneName) return;
 
-        Canvas canvas = Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
         if (canvas == null) return;
         if (canvas.transform.Find("PuzzlePreview") != null) return;
 

@@ -34,6 +34,11 @@ public class ExecutionEngine : MonoBehaviour
     private NumberCircle winningCircle;
     private float speedMultiplier = 1f;
 
+    // Tutorial hooks so the Level 1 tutorial can follow execution.
+    public static event System.Action ExecutionStarted;
+    public static event System.Action ExecutionFinished;
+    public static event System.Action PuzzleWon;
+
     private float MoveDuration => GameOptions.ReducedMotion ? 0.01f : moveDuration / speedMultiplier;
     private float SpawnDuration => GameOptions.ReducedMotion ? 0.01f : spawnDuration / speedMultiplier;
     private float MergePulseDuration => GameOptions.ReducedMotion ? 0.01f : mergePulseDuration / speedMultiplier;
@@ -55,7 +60,7 @@ public class ExecutionEngine : MonoBehaviour
         UpdateSpeedLabel();
         UpdatePlayLabel();
 
-        if (inventoryUI == null) inventoryUI = FindFirstObjectByType<TileInventoryUI>();
+        if (inventoryUI == null) inventoryUI = FindAnyObjectByType<TileInventoryUI>();
         if (inventoryUI != null) inventoryUI.OnTileSelected += AutoReset;
         if (gridController != null) gridController.OnCellSelected += AutoReset;
         if (labelController != null) labelController.boardState.OnCellChanged += AutoReset;
@@ -63,6 +68,7 @@ public class ExecutionEngine : MonoBehaviour
 
     private void OnPlayClicked()
     {
+        if (TutorialGate.Active && !TutorialGate.PlayAllowed()) return;
         Deselect();
         CancelPendingAuthoring();
         if (running)
@@ -77,6 +83,7 @@ public class ExecutionEngine : MonoBehaviour
 
     private void OnResetClicked()
     {
+        if (TutorialGate.Active) return;
         Deselect();
         CancelPendingAuthoring();
         ResetExecution();
@@ -84,12 +91,14 @@ public class ExecutionEngine : MonoBehaviour
 
     private void OnPauseClicked()
     {
+        if (TutorialGate.Active) return;
         Deselect();
         TogglePause();
     }
 
     private void OnStepClicked()
     {
+        if (TutorialGate.Active) return;
         Deselect();
         CancelPendingAuthoring();
         Step();
@@ -159,6 +168,7 @@ public class ExecutionEngine : MonoBehaviour
 
         StartCoroutine(RunProgram());
         UpdatePlayLabel();
+        ExecutionStarted?.Invoke();
     }
 
     public void ResetExecution()
@@ -232,7 +242,7 @@ public class ExecutionEngine : MonoBehaviour
         // Sweeps every NumberCircle in the scene - mid-merge operand circles are already
         // removed from the occupancy dict before their animations destroy them, so the
         // dictionary alone misses them and they would linger on screen after a reset.
-        foreach (NumberCircle circle in FindObjectsByType<NumberCircle>(FindObjectsSortMode.None))
+        foreach (NumberCircle circle in FindObjectsByType<NumberCircle>())
         {
             Destroy(circle.gameObject);
         }
@@ -326,6 +336,8 @@ public class ExecutionEngine : MonoBehaviour
                 gridController.ClearActiveColumn();
                 running = false;
                 UpdatePlayLabel();
+                PuzzleWon?.Invoke();
+                ExecutionFinished?.Invoke();
                 yield break;
             }
         }
@@ -333,6 +345,7 @@ public class ExecutionEngine : MonoBehaviour
         gridController.ClearActiveColumn();
         running = false;
         UpdatePlayLabel();
+        ExecutionFinished?.Invoke();
     }
 
     private IEnumerator WinSequence()
@@ -355,7 +368,7 @@ public class ExecutionEngine : MonoBehaviour
                 result = PuzzleRecords.Submit(puzzleId, instructions, cycles, processors);
                 recorded = true;
 
-                SolutionSession session = FindFirstObjectByType<SolutionSession>();
+                SolutionSession session = FindAnyObjectByType<SolutionSession>();
                 if (session != null)
                 {
                     session.MarkCurrentSolved();

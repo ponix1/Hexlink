@@ -88,6 +88,8 @@ public class TileInventoryUI : MonoBehaviour
 
     private bool IsTileAvailable(string symbol)
     {
+        if (TutorialGate.Active && !TutorialGate.TileAllowed(symbol)) return false;
+
         StandardPuzzleData standard = PuzzleSelection.SelectedPuzzle as StandardPuzzleData;
         if (standard == null) return true;
 

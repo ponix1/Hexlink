@@ -10,11 +10,10 @@ public static class SolutionPickerPopup
     private const float TileWidth = 420f;
     private const float TileHeight = 96f;
 
-    private static readonly Color SelectedFillColor = new Color(0.360f, 0.380f, 0.440f);
     private static readonly Color SolvedGreen = new Color(0.30f, 0.78f, 0.47f);
 
-    private const string GrayHex = "ADB4BE";
-    private const string LightHex = "E8EAED";
+    private static string GrayHex => HexlinkTheme.TextGrayHex;
+    private static string LightHex => HexlinkTheme.TextLightHex;
 
     private static PuzzleData puzzle;
     private static System.Action<int> onOpen;
@@ -37,7 +36,7 @@ public static class SolutionPickerPopup
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
         if (canvas == null || puzzleData == null) return;
 
         puzzle = puzzleData;
@@ -96,7 +95,7 @@ public static class SolutionPickerPopup
         TextMeshProUGUI bestTMP = best.GetComponent<TextMeshProUGUI>();
         bestTMP.color = HexlinkTheme.TextGray;
         bestTMP.raycastTarget = false;
-        bestTMP.enableWordWrapping = false;
+        bestTMP.textWrappingMode = TextWrappingModes.NoWrap;
         RectTransform bestRT = best.GetComponent<RectTransform>();
         bestRT.anchorMin = new Vector2(0f, 1f);
         bestRT.anchorMax = new Vector2(1f, 1f);
@@ -181,7 +180,7 @@ public static class SolutionPickerPopup
 
         BuildRenameRow(panel.transform);
 
-        openButton = CreateChamferButton(panel.transform, "OpenButton", "Open", HexlinkTheme.Accent, HexlinkTheme.Border, -320f, 150f).GetComponent<Button>();
+        openButton = CreateChamferButton(panel.transform, "OpenButton", "Open", HexlinkTheme.Accent, HexlinkTheme.AccentText, -320f, 150f).GetComponent<Button>();
         openButton.onClick.AddListener(OpenClicked);
 
         Button newButton = CreateChamferButton(panel.transform, "NewButton", "New", HexlinkTheme.Ghost, HexlinkTheme.TextLight, -160f, 150f).GetComponent<Button>();
@@ -199,6 +198,7 @@ public static class SolutionPickerPopup
         returnButton.onClick.AddListener(Close);
 
         Refresh();
+        ThemeSwitcher.ApplyToSubtree(root.transform);
     }
 
     public static void Close()
@@ -251,12 +251,26 @@ public static class SolutionPickerPopup
         }
 
         bool selected = selectedIndex >= 0 && selectedIndex < entries.Count;
-        if (openButton != null) openButton.interactable = selected;
-        if (renameButton != null) renameButton.interactable = selected;
-        if (deleteButton != null) deleteButton.interactable = selected;
+        SetButtonDim(openButton, selected);
+        SetButtonDim(renameButton, selected);
+        SetButtonDim(deleteButton, selected);
 
         bool armed = Time.realtimeSinceStartup - deleteArmedAt < 4f;
         if (deleteLabel != null) deleteLabel.text = armed ? "Sure?" : "Delete";
+
+        // Rebuilt tiles carry raw palette colours - re-apply the theme so they
+        // match the rest of the popup.
+        ThemeSwitcher.ApplyToSubtree(root.transform);
+    }
+
+    private static void SetButtonDim(Button button, bool enabled)
+    {
+        if (button == null) return;
+
+        button.interactable = enabled;
+        CanvasGroup group = button.GetComponent<CanvasGroup>();
+        if (group == null) group = button.gameObject.AddComponent<CanvasGroup>();
+        group.alpha = enabled ? 1f : 0.4f;
     }
 
     private static void CreateTile(Transform parent, int index, SavedSolution entry)
@@ -276,7 +290,7 @@ public static class SolutionPickerPopup
         fill.transform.SetParent(tile.transform, false);
         ChamferedImage fillChamfer = fill.AddComponent<ChamferedImage>();
         fillChamfer.Chamfer = 14f;
-        fillChamfer.color = selected ? SelectedFillColor : HexlinkTheme.CellFill;
+        fillChamfer.color = selected ? HexlinkTheme.SelectedTileFill : HexlinkTheme.CellFill;
         fillChamfer.raycastTarget = true;
         RectTransform fillRT = fill.GetComponent<RectTransform>();
         fillRT.anchorMin = Vector2.zero;
@@ -294,7 +308,7 @@ public static class SolutionPickerPopup
         nameTMP.color = solved ? SolvedGreen : HexlinkTheme.TextLight;
         nameTMP.alignment = TextAlignmentOptions.Midline;
         nameTMP.raycastTarget = false;
-        nameTMP.enableWordWrapping = false;
+        nameTMP.textWrappingMode = TextWrappingModes.NoWrap;
         RectTransform nameRT = nameGO.GetComponent<RectTransform>();
         nameRT.anchorMin = new Vector2(0f, 1f);
         nameRT.anchorMax = new Vector2(1f, 1f);
@@ -308,7 +322,7 @@ public static class SolutionPickerPopup
         TextMeshProUGUI metricsTMP = metrics.GetComponent<TextMeshProUGUI>();
         metricsTMP.color = HexlinkTheme.TextGray;
         metricsTMP.raycastTarget = false;
-        metricsTMP.enableWordWrapping = false;
+        metricsTMP.textWrappingMode = TextWrappingModes.NoWrap;
         RectTransform metricsRT = metrics.GetComponent<RectTransform>();
         metricsRT.anchorMin = new Vector2(0f, 0f);
         metricsRT.anchorMax = new Vector2(1f, 0f);
@@ -328,12 +342,14 @@ public static class SolutionPickerPopup
         rowRT.anchoredPosition = new Vector2(0f, 68f);
         rowRT.sizeDelta = new Vector2(872f, 38f);
 
-        GameObject inputGO = new GameObject("RenameInput", typeof(RectTransform), typeof(Image), typeof(TMP_InputField));
+        GameObject inputGO = new GameObject("RenameInput", typeof(RectTransform), typeof(TMP_InputField));
         inputGO.transform.SetParent(renameRow.transform, false);
-        Image inputBG = inputGO.GetComponent<Image>();
-        inputBG.color = HexlinkTheme.CellFrame;
+        ChamferedImage inputChamfer = inputGO.AddComponent<ChamferedImage>();
+        inputChamfer.Chamfer = 8f;
+        inputChamfer.color = HexlinkTheme.CellFrame;
+        inputChamfer.raycastTarget = true;
         renameInput = inputGO.GetComponent<TMP_InputField>();
-        renameInput.targetGraphic = inputBG;
+        renameInput.targetGraphic = inputChamfer;
         renameInput.characterLimit = 40;
         RectTransform inputRT = inputGO.GetComponent<RectTransform>();
         inputRT.anchorMin = Vector2.zero;
@@ -364,7 +380,7 @@ public static class SolutionPickerPopup
         StretchFull(placeholderGO.GetComponent<RectTransform>());
         renameInput.placeholder = placeholderTMP;
 
-        GameObject confirm = CreateChamferButton(renameRow.transform, "ConfirmButton", "Confirm", HexlinkTheme.Accent, HexlinkTheme.Border, 0f, 0f);
+        GameObject confirm = CreateChamferButton(renameRow.transform, "ConfirmButton", "Confirm", HexlinkTheme.Accent, HexlinkTheme.AccentText, 0f, 0f);
         RectTransform confirmRT = confirm.GetComponent<RectTransform>();
         confirmRT.anchorMin = new Vector2(1f, 0.5f);
         confirmRT.anchorMax = new Vector2(1f, 0.5f);

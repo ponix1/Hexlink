@@ -16,7 +16,7 @@ public static class HexagonHitboxApplier
 
     private static void Apply()
     {
-        foreach (Image image in Object.FindObjectsByType<Image>(FindObjectsSortMode.None))
+        foreach (Image image in Object.FindObjectsByType<Image>())
         {
             if (image.sprite == null) continue;
 
@@ -28,7 +28,7 @@ public static class HexagonHitboxApplier
 
         // Full-rect child graphics (especially stretched labels) override the parent
         // Image's alpha hit test - only the button's own graphic should receive raycasts.
-        foreach (Button button in Object.FindObjectsByType<Button>(FindObjectsSortMode.None))
+        foreach (Button button in Object.FindObjectsByType<Button>())
         {
             Graphic buttonGraphic = button.GetComponent<Graphic>();
             Graphic targetGraphic = button.targetGraphic as Graphic;
@@ -40,7 +40,7 @@ public static class HexagonHitboxApplier
             }
         }
 
-        foreach (TextMeshProUGUI tmp in Object.FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None))
+        foreach (TextMeshProUGUI tmp in Object.FindObjectsByType<TextMeshProUGUI>())
         {
             tmp.raycastTarget = false;
         }

@@ -45,11 +45,14 @@ public class PuzzleCardView : MonoBehaviour, IPointerEnterHandler
         {
             completeBadge.SetActive(complete);
         }
+
+        ThemeSwitcher.ApplyToSubtree(transform);
     }
 
     private void OnCardClicked()
     {
         PuzzleSelection.SelectedPuzzle = currentData;
+        PuzzleSelection.ReturnScene = "Puzzle_Select";
         SolutionPickerPopup.Show(currentData,
             index =>
             {

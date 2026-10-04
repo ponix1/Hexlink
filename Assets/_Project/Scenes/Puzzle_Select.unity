@@ -177,7 +177,7 @@ MonoBehaviour:
   m_Elasticity: 0.1
   m_Inertia: 1
   m_DecelerationRate: 0.135
-  m_ScrollSensitivity: 1
+  m_ScrollSensitivity: 10
   m_Viewport: {fileID: 1043032417}
   m_HorizontalScrollbar: {fileID: 0}
   m_VerticalScrollbar: {fileID: 0}
@@ -209,7 +209,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChamferedImage
   m_Material: {fileID: 0}
-  m_Color: {r: 0.165, g: 0.176, b: 0.204, a: 1}
+  m_Color: {r: 0.776, g: 0.8, b: 0.863, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -227,6 +227,7 @@ MonoBehaviour:
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
   chamfer: 18
+  outlineThickness: 0
 --- !u!1 &165128090
 GameObject:
   m_ObjectHideFlags: 0
@@ -546,7 +547,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChamferedImage
   m_Material: {fileID: 0}
-  m_Color: {r: 0.165, g: 0.176, b: 0.204, a: 1}
+  m_Color: {r: 0.776, g: 0.8, b: 0.863, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -564,6 +565,7 @@ MonoBehaviour:
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
   chamfer: 18
+  outlineThickness: 0
 --- !u!1 &1043032416
 GameObject:
   m_ObjectHideFlags: 0
@@ -637,7 +639,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChamferedImage
   m_Material: {fileID: 0}
-  m_Color: {r: 0.22, g: 0.231, b: 0.267, a: 1}
+  m_Color: {r: 0.945, g: 0.953, b: 0.976, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -655,6 +657,7 @@ MonoBehaviour:
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
   chamfer: 18
+  outlineThickness: 0
 --- !u!1 &1108050176
 GameObject:
   m_ObjectHideFlags: 0
@@ -981,7 +984,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ChamferedImage
   m_Material: {fileID: 0}
-  m_Color: {r: 0.22, g: 0.231, b: 0.267, a: 1}
+  m_Color: {r: 0.945, g: 0.953, b: 0.976, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -999,6 +1002,7 @@ MonoBehaviour:
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
   chamfer: 18
+  outlineThickness: 0
 --- !u!1 &1911932032
 GameObject:
   m_ObjectHideFlags: 0
@@ -1170,7 +1174,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 0
-  m_fontColor: {r: 0.91, g: 0.918, b: 0.929, a: 1}
+  m_fontColor: {r: 0.2, g: 0.231, b: 0.306, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:

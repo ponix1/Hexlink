@@ -4,6 +4,7 @@ using UnityEngine;
 public class GameContentRegistry : ScriptableObject
 {
     public List<WorldData> worlds = new List<WorldData>();
+    public List<PuzzleData> levels = new List<PuzzleData>();
 
     public static GameContentRegistry Load()
     {

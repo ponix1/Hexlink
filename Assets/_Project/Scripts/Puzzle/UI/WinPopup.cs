@@ -11,7 +11,6 @@ public static class WinPopup
     private const float ValueWidth = 75f;
     private const float TagWidth = 115f;
 
-    private static readonly Color RowColor = HexlinkTheme.CellFrame;
     private static readonly Color GoldColor = new Color(0.85f, 0.68f, 0.28f);
 
     private static GameObject root;
@@ -20,7 +19,7 @@ public static class WinPopup
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
         if (canvas == null) return;
 
         root = new GameObject("WinPopup", typeof(RectTransform), typeof(Image), typeof(Button), typeof(CanvasGroup));
@@ -34,9 +33,11 @@ public static class WinPopup
         backdropButton.transition = Button.Transition.None;
         backdropButton.onClick.AddListener(Close);
 
-        GameObject border = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        GameObject border = new GameObject("Border", typeof(RectTransform));
         border.transform.SetParent(root.transform, false);
-        border.GetComponent<Image>().color = HexlinkTheme.Border;
+        ChamferedImage borderChamfer = border.AddComponent<ChamferedImage>();
+        borderChamfer.Chamfer = 18f;
+        borderChamfer.color = HexlinkTheme.Border;
         RectTransform borderRT = border.GetComponent<RectTransform>();
         borderRT.anchorMin = new Vector2(0.5f, 0.5f);
         borderRT.anchorMax = new Vector2(0.5f, 0.5f);
@@ -53,7 +54,15 @@ public static class WinPopup
         panelRT.offsetMin = new Vector2(4f, 4f);
         panelRT.offsetMax = new Vector2(-4f, -4f);
 
-        GameObject title = CreateTMP("Title", panel.transform, "Puzzle Solved!", 30, FontStyles.Bold);
+        bool levelMode = PuzzleSelection.ReturnScene == "Level_Select";
+        PuzzleData nextLevel = null;
+        if (levelMode) LevelProgress.TryGetNext(PuzzleSelection.SelectedPuzzle, out nextLevel);
+        string leaveScene = string.IsNullOrEmpty(PuzzleSelection.ReturnScene)
+            ? "Puzzle_Select"
+            : PuzzleSelection.ReturnScene;
+
+        GameObject title = CreateTMP("Title", panel.transform,
+            levelMode ? "Level Complete!" : "Puzzle Solved!", 30, FontStyles.Bold);
         title.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.TextLight;
         RectTransform titleRT = title.GetComponent<RectTransform>();
         titleRT.anchorMin = new Vector2(0f, 1f);
@@ -104,23 +113,52 @@ public static class WinPopup
         CreateMetricRow(rows.transform, "Processors", result.Processors, result.PrevProcessors, result.NewProcessors);
         CreateMetricRow(rows.transform, "Sum", result.Sum, result.PrevSum, result.NewSum);
 
-        GameObject puzzlesButton = CreateButton(panel.transform, "PuzzlesButton", "Puzzles", HexlinkTheme.Ghost, HexlinkTheme.TextLight);
-        puzzlesButton.GetComponent<Button>().onClick.AddListener(() => SceneManager.LoadScene("Puzzle_Select"));
-        RectTransform puzzlesRT = puzzlesButton.GetComponent<RectTransform>();
-        puzzlesRT.anchorMin = new Vector2(0.5f, 0f);
-        puzzlesRT.anchorMax = new Vector2(0.5f, 0f);
-        puzzlesRT.pivot = new Vector2(0.5f, 0f);
-        puzzlesRT.anchoredPosition = new Vector2(-80f, 14f);
-        puzzlesRT.sizeDelta = new Vector2(150f, 36f);
+        float continueX = nextLevel != null ? -160f : -80f;
+        float leaveX = nextLevel != null ? 0f : 80f;
 
-        GameObject continueButton = CreateButton(panel.transform, "ContinueButton", "Continue", HexlinkTheme.Accent, HexlinkTheme.Border);
+        GameObject continueButton = CreateButton(panel.transform, "ContinueButton", "Continue", HexlinkTheme.Ghost, HexlinkTheme.TextLight);
         continueButton.GetComponent<Button>().onClick.AddListener(Close);
         RectTransform continueRT = continueButton.GetComponent<RectTransform>();
         continueRT.anchorMin = new Vector2(0.5f, 0f);
         continueRT.anchorMax = new Vector2(0.5f, 0f);
         continueRT.pivot = new Vector2(0.5f, 0f);
-        continueRT.anchoredPosition = new Vector2(80f, 14f);
+        continueRT.anchoredPosition = new Vector2(continueX, 14f);
         continueRT.sizeDelta = new Vector2(150f, 36f);
+
+        GameObject leaveButton = CreateButton(panel.transform, "LeaveButton", "Leave", HexlinkTheme.Ghost, HexlinkTheme.TextLight);
+        leaveButton.GetComponent<Button>().onClick.AddListener(() =>
+        {
+            Close();
+            SceneManager.LoadScene(leaveScene);
+        });
+        RectTransform leaveRT = leaveButton.GetComponent<RectTransform>();
+        leaveRT.anchorMin = new Vector2(0.5f, 0f);
+        leaveRT.anchorMax = new Vector2(0.5f, 0f);
+        leaveRT.pivot = new Vector2(0.5f, 0f);
+        leaveRT.anchoredPosition = new Vector2(leaveX, 14f);
+        leaveRT.sizeDelta = new Vector2(150f, 36f);
+
+        if (nextLevel != null)
+        {
+            PuzzleData next = nextLevel;
+            GameObject nextButton = CreateButton(panel.transform, "NextLevelButton", "Next level", HexlinkTheme.Accent, HexlinkTheme.AccentText);
+            nextButton.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                Close();
+                PuzzleSelection.SelectedPuzzle = next;
+                PuzzleSelection.ReturnScene = "Level_Select";
+                SolutionStore.PendingIndex = SolutionStore.PendingNew;
+                SceneManager.LoadScene("Puzzle_Play");
+            });
+            RectTransform nextRT = nextButton.GetComponent<RectTransform>();
+            nextRT.anchorMin = new Vector2(0.5f, 0f);
+            nextRT.anchorMax = new Vector2(0.5f, 0f);
+            nextRT.pivot = new Vector2(0.5f, 0f);
+            nextRT.anchoredPosition = new Vector2(160f, 14f);
+            nextRT.sizeDelta = new Vector2(150f, 36f);
+        }
+
+        ThemeSwitcher.ApplyToSubtree(root.transform);
 
         if (!GameOptions.ReducedMotion)
         {
@@ -177,7 +215,7 @@ public static class WinPopup
     private static void CreateMetricRow(Transform parent, string label, int yours, int best, bool improved)
     {
         GameObject row = CreateRow(parent, "Row_" + label, 34f);
-        row.AddComponent<Image>().color = RowColor;
+        row.AddComponent<Image>().color = HexlinkTheme.Strip;
 
         GameObject name = CreateTMP("Name", row.transform, label, 16, FontStyles.Normal);
         name.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Left;
@@ -205,11 +243,7 @@ public static class WinPopup
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = button.GetComponent<Image>();
         buttonComponent.transition = Button.Transition.ColorTint;
-        ColorBlock colors = buttonComponent.colors;
-        colors.highlightedColor = new Color(1.18f, 1.18f, 1.18f);
-        colors.pressedColor = new Color(0.84f, 0.84f, 0.84f);
-        colors.selectedColor = Color.white;
-        buttonComponent.colors = colors;
+        HexlinkTheme.ApplyHoverTint(buttonComponent);
 
         GameObject text = CreateTMP("Label", button.transform, label, 14, FontStyles.Bold);
         text.GetComponent<TextMeshProUGUI>().color = textColor;

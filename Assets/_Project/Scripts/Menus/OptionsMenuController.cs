@@ -9,6 +9,7 @@ public class OptionsMenuController : MonoBehaviour
 
     private int speedIndex;
     private TextMeshProUGUI speedLabel;
+    private TextMeshProUGUI designLabel;
     private Transform rowsRoot;
 
     private void Start()
@@ -29,8 +30,27 @@ public class OptionsMenuController : MonoBehaviour
         WireStepper("PanRow", v => GameOptions.PanSpeed = v, GameOptions.PanSpeed, 0.005f, 0.005f, 0.08f, "F3");
         WireStepper("OrbitRow", v => GameOptions.OrbitSpeed = v, GameOptions.OrbitSpeed, 1f, 1f, 15f, "F0");
 
+        WireStepper("GlassOpacityRow", v =>
+        {
+            GameOptions.GlassOutlineAlpha = v / 100f;
+            GameOptions.Save();
+            ThemeSwitcher.ApplyToScene();
+        }, Mathf.Round(GameOptions.GlassOutlineAlpha * 100f), 5f, 0f, 100f, "F0");
+
+        WireGlassColourRow();
+        SetGlassSectionVisible(GameOptions.ThemeIndex == 2);
+
         if (rowsRoot != null)
         {
+            Transform designRow = rowsRoot.Find("DesignRow");
+            if (designRow != null)
+            {
+                Button designButton = designRow.Find("DesignButton").GetComponent<Button>();
+                designLabel = designButton.GetComponentInChildren<TextMeshProUGUI>();
+                UpdateDesignLabel();
+                designButton.onClick.AddListener(CycleDesign);
+            }
+
             Transform speedRow = rowsRoot.Find("SpeedRow");
             if (speedRow != null)
             {
@@ -77,6 +97,83 @@ public class OptionsMenuController : MonoBehaviour
     private void UpdateSpeedLabel()
     {
         if (speedLabel != null) speedLabel.text = SpeedLabels[speedIndex];
+    }
+
+    private void CycleDesign()
+    {
+        GameOptions.ThemeIndex = (GameOptions.ThemeIndex + 1) % HexlinkTheme.ThemeCount;
+        GameOptions.Save();
+        ThemeSwitcher.ApplyToScene();
+        UpdateDesignLabel();
+        SetGlassSectionVisible(GameOptions.ThemeIndex == 2);
+    }
+
+    private void WireGlassColourRow()
+    {
+        Transform gridRow = rowsRoot != null ? rowsRoot.Find("GlassColourRowGrid") : null;
+        if (gridRow == null) return;
+
+        foreach (Transform swatch in gridRow)
+        {
+            if (!swatch.name.StartsWith("Swatch_")) continue;
+            string hex = swatch.name.Substring("Swatch_".Length);
+
+            swatch.GetComponent<Button>().onClick.AddListener(() =>
+            {
+                if (GameOptions.GlassOutlineHex == hex) return;
+                GameOptions.GlassOutlineHex = hex;
+                GameOptions.Save();
+                UpdateSwatchSelection(gridRow);
+                ThemeSwitcher.ApplyToScene();
+            });
+        }
+
+        UpdateSwatchSelection(gridRow);
+    }
+
+    private static void UpdateSwatchSelection(Transform gridRow)
+    {
+        foreach (Transform swatch in gridRow)
+        {
+            if (!swatch.name.StartsWith("Swatch_")) continue;
+
+            for (int i = swatch.childCount - 1; i >= 0; i--)
+            {
+                if (swatch.GetChild(i).name == "Sel") Object.DestroyImmediate(swatch.GetChild(i).gameObject);
+            }
+
+            string hex = swatch.name.Substring("Swatch_".Length);
+            if (GameOptions.GlassOutlineHex != hex) continue;
+
+            GameObject sel = new GameObject("Sel", typeof(RectTransform));
+            sel.transform.SetParent(swatch, false);
+            ChamferedImage ring = sel.AddComponent<ChamferedImage>();
+            ring.Chamfer = 6f;
+            ring.OutlineThickness = 2f;
+            ring.color = Color.white;
+            ring.raycastTarget = false;
+            RectTransform selRT = sel.GetComponent<RectTransform>();
+            selRT.anchorMin = Vector2.zero;
+            selRT.anchorMax = Vector2.one;
+            selRT.offsetMin = new Vector2(-3f, -3f);
+            selRT.offsetMax = new Vector2(3f, 3f);
+        }
+    }
+
+    private void SetGlassSectionVisible(bool visible)
+    {
+        if (rowsRoot == null) return;
+        string[] names = { "OUTLINEHeader", "GlassOpacityRow", "GlassColourRow", "GlassColourRowGrid" };
+        foreach (string name in names)
+        {
+            Transform row = rowsRoot.Find(name);
+            if (row != null) row.gameObject.SetActive(visible);
+        }
+    }
+
+    private void UpdateDesignLabel()
+    {
+        if (designLabel != null) designLabel.text = HexlinkTheme.ThemeName(GameOptions.ThemeIndex);
     }
 
     private void WireToggle(string rowName, System.Action<bool> setter, bool initial)

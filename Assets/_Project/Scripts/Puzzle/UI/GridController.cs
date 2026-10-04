@@ -11,6 +11,11 @@ public class GridController : MonoBehaviour
     [SerializeField] private HexTileSelector tileSelector;
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private RectTransform gridContent;
+
+    // Root of the runtime-managed cell area - used by ThemeSwitcher to scope
+    // which graphics must not be structurally converted (they are repainted
+    // by this controller on every state change).
+    public RectTransform GridContentRoot => gridContent;
     [SerializeField] private RectTransform columnHeaderRow;
     [SerializeField] private GameObject processorRowTemplate;
     [SerializeField] private GameObject cellTemplate;
@@ -19,24 +24,24 @@ public class GridController : MonoBehaviour
     [SerializeField] private GameObject arrowTokenTemplate;
     [SerializeField] private Button collapseButton;
 
-    private static readonly Color ChipSubjectColor = new Color(0.384f, 0.412f, 0.463f);
-    private static readonly Color ChipOperationColor = new Color(0.322f, 0.459f, 0.510f);
-    private static readonly Color ChipOperandColor = new Color(0.424f, 0.459f, 0.510f);
+    private static Color ChipSubjectColor => HexlinkTheme.ChipSubject;
+    private static Color ChipOperationColor => HexlinkTheme.ChipOperation;
+    private static Color ChipOperandColor => HexlinkTheme.ChipOperand;
     private const int TokensPerRow = 4;
 
-    private Color selectedFrame = HexlinkTheme.Accent;
-    private Color selectedFill = new Color(0.230f, 0.302f, 0.322f);
-    private Color errorFrame = new Color(0.780f, 0.490f, 0.490f);
-    private Color errorFill = new Color(0.373f, 0.220f, 0.220f);
-    private Color pendingFrame = new Color(0.980f, 0.780f, 0.320f);
-    private Color pendingFill = new Color(0.573f, 0.439f, 0.173f);
-    private Color normalFrame = HexlinkTheme.CellFrame;
-    private Color normalFill = HexlinkTheme.CellFill;
-    private Color normalFillOdd = new Color(0.318f, 0.333f, 0.388f);
-    private Color hoverFill = new Color(0.353f, 0.369f, 0.424f);
-    private Color hoverFillOdd = new Color(0.380f, 0.396f, 0.451f);
-    private Color runningFill = new Color(0.294f, 0.365f, 0.392f);
-    private Color headerTextColor = HexlinkTheme.TextGray;
+    private Color selectedFrame => HexlinkTheme.SelectedFrame;
+    private Color selectedFill => HexlinkTheme.SelectedFill;
+    private Color errorFrame => HexlinkTheme.ErrorFrame;
+    private Color errorFill => HexlinkTheme.ErrorFill;
+    private Color pendingFrame => HexlinkTheme.PendingFrame;
+    private Color pendingFill => HexlinkTheme.PendingFill;
+    private Color normalFrame => HexlinkTheme.CellFrame;
+    private Color normalFill => HexlinkTheme.CellFill;
+    private Color normalFillOdd => HexlinkTheme.NormalFillOdd;
+    private Color hoverFill => HexlinkTheme.HoverFill;
+    private Color hoverFillOdd => HexlinkTheme.HoverFillOdd;
+    private Color runningFill => HexlinkTheme.RunningFill;
+    private Color headerTextColor => HexlinkTheme.TextGray;
 
     private HexCoord? pendingChangeCoord;
 
@@ -78,8 +83,16 @@ public class GridController : MonoBehaviour
 
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
-    public int ColumnCount => columnCount;
+
+    // Tutorial read access to the instruction grid.
     public int ProcessorCount => rows.Count;
+    public int ColumnCount => columnCount;
+
+    public InstructionData GetInstructionAt(int processorIndex, int columnIndex)
+    {
+        Cell cell = GetCell(processorIndex, columnIndex);
+        return cell != null ? cell.Instruction : null;
+    }
 
     public event System.Action OnCellSelected;
     public event System.Action OnGridChanged;
@@ -163,16 +176,6 @@ public class GridController : MonoBehaviour
         LayoutElement chipLayout = squareTokenTemplate != null ? squareTokenTemplate.GetComponent<LayoutElement>() : null;
         float chipSize = chipLayout != null ? chipLayout.preferredHeight : 30f;
         chipRowHeight = Mathf.Max(26f, chipSize + 2f);
-
-        if (GameOptions.ColourBlindMode)
-        {
-            selectedFrame = new Color(0.561f, 0.651f, 0.788f);
-            selectedFill = new Color(0.231f, 0.267f, 0.322f);
-            errorFrame = new Color(0.753f, 0.541f, 0.333f);
-            errorFill = new Color(0.322f, 0.267f, 0.208f);
-            pendingFrame = new Color(0.720f, 0.620f, 0.950f);
-            pendingFill = new Color(0.443f, 0.384f, 0.604f);
-        }
 
         if (collapseButton != null)
         {
@@ -920,7 +923,7 @@ public class GridController : MonoBehaviour
         TextMeshProUGUI radicalTMP = radical.GetComponent<TextMeshProUGUI>();
         radicalTMP.text = "\u221A";
         radicalTMP.fontSize = Mathf.Round(chipSize * 0.67f);
-        radicalTMP.color = new Color(0.910f, 0.918f, 0.929f);
+        radicalTMP.color = HexlinkTheme.TextLight;
         radicalTMP.alignment = TextAlignmentOptions.Center;
         LayoutElement radicalLE = radical.AddComponent<LayoutElement>();
         radicalLE.preferredWidth = Mathf.Round(chipSize * 0.45f);
@@ -936,7 +939,7 @@ public class GridController : MonoBehaviour
 
         GameObject overline = new GameObject("Overline", typeof(RectTransform), typeof(Image));
         overline.transform.SetParent(square.transform, false);
-        overline.GetComponent<Image>().color = new Color(0.910f, 0.918f, 0.929f);
+        overline.GetComponent<Image>().color = HexlinkTheme.TextLight;
         RectTransform overlineRT = overline.GetComponent<RectTransform>();
         overlineRT.anchorMin = new Vector2(0f, 1f);
         overlineRT.anchorMax = new Vector2(1f, 1f);

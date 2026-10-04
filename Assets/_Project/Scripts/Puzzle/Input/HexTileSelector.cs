@@ -139,6 +139,7 @@ public class HexTileSelector : MonoBehaviour
 
         if (Input.GetMouseButtonDown(2))
         {
+            if (TutorialGate.Active && !TutorialGate.AllowRemoval) return;
             if (identity != null && labelController.boardState.HasTile(identity.coordinate))
             {
                 labelController.boardState.RemoveTile(identity.coordinate);
@@ -155,6 +156,7 @@ public class HexTileSelector : MonoBehaviour
             string tileToPlace = inventoryUI != null ? inventoryUI.CurrentSelectedTile : "";
             if (!authoringBusy && !string.IsNullOrEmpty(tileToPlace))
             {
+                if (TutorialGate.Active && !TutorialGate.AllowPlacement) return;
                 TileData tileData = TileDataFactory.CreateFromSymbol(tileToPlace);
                 if (tileData == null) return;
 
@@ -173,6 +175,7 @@ public class HexTileSelector : MonoBehaviour
                         grid.ClearPendingChange();
                         Debug.Log("Change confirmed - instructions updated.");
                         labelController.boardState.PlaceTile(identity.coordinate, tileData);
+                        if (inventoryUI != null) inventoryUI.DeselectTile();
                     }
                     else
                     {
@@ -183,9 +186,11 @@ public class HexTileSelector : MonoBehaviour
 
                 if (grid != null) grid.ClearPendingChange();
                 labelController.boardState.PlaceTile(identity.coordinate, tileData);
+                if (inventoryUI != null) inventoryUI.DeselectTile();
             }
             else
             {
+                if (TutorialGate.Active && !TutorialGate.AllowAuthoring) return;
                 OnTileClicked?.Invoke(identity.coordinate);
             }
         }

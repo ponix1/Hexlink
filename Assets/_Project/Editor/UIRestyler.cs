@@ -194,7 +194,9 @@ public static class UIRestyler
                 TextMeshProUGUI header = t.GetComponent<TextMeshProUGUI>();
                 if (header != null)
                 {
-                    SetTMPColor(header, HexlinkTheme.TextLight);
+                    // Titles float over the starry sky - pure white in both themes
+                    // (not a palette colour, so ThemeSwitcher never remaps them).
+                    SetTMPColor(header, Color.white);
                     EditorUtility.SetDirty(header.gameObject);
                 }
             }

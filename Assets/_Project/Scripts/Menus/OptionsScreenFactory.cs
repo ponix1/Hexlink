@@ -6,15 +6,9 @@ using TMPro;
 public static class OptionsScreenFactory
 {
     private const float PanelWidth = 490f;
-    private const float PanelHeight = 660f;
+    private const float PanelHeight = 858f;
     private const float RowHeight = 36f;
     private const float LabelWidth = 220f;
-
-    private static readonly Color BorderColor = HexlinkTheme.Border;
-    private static readonly Color PanelColor = HexlinkTheme.Panel;
-    private static readonly Color ControlColor = HexlinkTheme.Ghost;
-    private static readonly Color TextColor = HexlinkTheme.TextLight;
-    private static readonly Color MutedTextColor = HexlinkTheme.TextGray;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoSpawn()
@@ -27,7 +21,7 @@ public static class OptionsScreenFactory
     {
         if (SceneManager.GetActiveScene().name != "Main Menu") return;
 
-        Canvas canvas = Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
         if (canvas == null) return;
 
         Transform existing = canvas.transform.Find("OptionsScreen");
@@ -42,18 +36,23 @@ public static class OptionsScreenFactory
 
     public static GameObject Build(Canvas canvas)
     {
-        GameObject screen = new GameObject("OptionsScreen", typeof(RectTransform), typeof(Image));
+        GameObject screen = new GameObject("OptionsScreen", typeof(RectTransform), typeof(Image), typeof(Button));
         screen.transform.SetParent(canvas.transform, false);
         screen.GetComponent<Image>().color = HexlinkTheme.BackdropDim;
+        Button backdropButton = screen.GetComponent<Button>();
+        backdropButton.transition = Button.Transition.None;
+        backdropButton.targetGraphic = screen.GetComponent<Image>();
         RectTransform screenRT = screen.GetComponent<RectTransform>();
         screenRT.anchorMin = Vector2.zero;
         screenRT.anchorMax = Vector2.one;
         screenRT.offsetMin = Vector2.zero;
         screenRT.offsetMax = Vector2.zero;
 
-        GameObject border = new GameObject("Border", typeof(RectTransform), typeof(Image));
+        GameObject border = new GameObject("Border", typeof(RectTransform));
         border.transform.SetParent(screen.transform, false);
-        border.GetComponent<Image>().color = BorderColor;
+        ChamferedImage borderChamfer = border.AddComponent<ChamferedImage>();
+        borderChamfer.Chamfer = 18f;
+        borderChamfer.color = HexlinkTheme.Border;
         RectTransform borderRT = border.GetComponent<RectTransform>();
         borderRT.anchorMin = new Vector2(0.5f, 0.5f);
         borderRT.anchorMax = new Vector2(0.5f, 0.5f);
@@ -63,7 +62,7 @@ public static class OptionsScreenFactory
 
         GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
         panel.transform.SetParent(border.transform, false);
-        panel.GetComponent<Image>().color = PanelColor;
+        panel.GetComponent<Image>().color = HexlinkTheme.Panel;
         RectTransform panelRT = panel.GetComponent<RectTransform>();
         panelRT.anchorMin = Vector2.zero;
         panelRT.anchorMax = Vector2.one;
@@ -81,7 +80,7 @@ public static class OptionsScreenFactory
 
         GameObject divider = new GameObject("Divider", typeof(RectTransform), typeof(Image));
         divider.transform.SetParent(panel.transform, false);
-        divider.GetComponent<Image>().color = BorderColor;
+        divider.GetComponent<Image>().color = HexlinkTheme.Border;
         RectTransform dividerRT = divider.GetComponent<RectTransform>();
         dividerRT.anchorMin = new Vector2(0f, 1f);
         dividerRT.anchorMax = new Vector2(1f, 1f);
@@ -105,6 +104,16 @@ public static class OptionsScreenFactory
         rowsVLG.spacing = 8f;
         rowsVLG.padding = new RectOffset(24, 24, 10, 10);
 
+        CreateSectionHeader(rows.transform, "APPEARANCE");
+        GameObject designRow = CreateRow(rows.transform, "DesignRow");
+        CreateRowLabel(designRow.transform, "Design");
+        CreateSpacer(designRow.transform);
+        CreateControlButton(designRow.transform, "DesignButton", HexlinkTheme.ThemeName(GameOptions.ThemeIndex), 100f, 30f);
+
+        CreateSectionHeader(rows.transform, "OUTLINE");
+        CreateStepperRow(rows.transform, "GlassOpacityRow", "Opacity");
+        CreateColourRow(rows.transform, "GlassColourRow", "Colour");
+
         CreateSectionHeader(rows.transform, "ACCESSIBILITY");
         CreateToggleRow(rows.transform, "ColourBlindRow", "Colour-blind mode");
         CreateToggleRow(rows.transform, "ReducedMotionRow", "Reduced motion");
@@ -121,7 +130,11 @@ public static class OptionsScreenFactory
         CreateSectionHeader(rows.transform, "SYSTEM");
         CreateToggleRow(rows.transform, "VSyncRow", "VSync");
 
-        GameObject closeButton = CreateControlButton(panel.transform, "CloseButton", "Close", 130f, 32f);
+        GameObject closeButton = CreateControlButton(panel.transform, "CloseButton", "Close", 190f, 42f);
+        closeButton.GetComponent<Image>().color = HexlinkTheme.Accent;
+        TextMeshProUGUI closeLabel = closeButton.GetComponentInChildren<TextMeshProUGUI>();
+        closeLabel.color = HexlinkTheme.AccentText;
+        closeLabel.fontSize = Mathf.Max(8f, Mathf.Round(16f * GameOptions.UiScale));
         RectTransform closeRT = closeButton.GetComponent<RectTransform>();
         closeRT.anchorMin = new Vector2(0.5f, 0f);
         closeRT.anchorMax = new Vector2(0.5f, 0f);
@@ -129,6 +142,9 @@ public static class OptionsScreenFactory
         closeRT.anchoredPosition = new Vector2(0f, 14f);
 
         OptionsMenuController controller = screen.AddComponent<OptionsMenuController>();
+        backdropButton.onClick.AddListener(controller.Close);
+
+        ThemeSwitcher.ApplyToSubtree(screen.transform);
 
         Transform optionsButton = FindDeep(canvas.transform, "Options");
         if (optionsButton != null)
@@ -147,7 +163,7 @@ public static class OptionsScreenFactory
     {
         GameObject header = CreateTMP(text + "Header", parent, text, 12, FontStyles.Bold);
         header.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Left;
-        header.GetComponent<TextMeshProUGUI>().color = MutedTextColor;
+        header.GetComponent<TextMeshProUGUI>().color = HexlinkTheme.TextGray;
         header.AddComponent<LayoutElement>().preferredHeight = 20f;
     }
 
@@ -199,7 +215,7 @@ public static class OptionsScreenFactory
 
         GameObject knob = new GameObject("Knob", typeof(RectTransform), typeof(Image));
         knob.transform.SetParent(toggle.transform, false);
-        knob.GetComponent<Image>().color = new Color(0.95f, 0.95f, 0.95f);
+        knob.GetComponent<Image>().color = HexlinkTheme.Knob;
         RectTransform knobRT = knob.GetComponent<RectTransform>();
         knobRT.anchorMin = new Vector2(0.5f, 0.5f);
         knobRT.anchorMax = new Vector2(0.5f, 0.5f);
@@ -226,11 +242,52 @@ public static class OptionsScreenFactory
         CreateControlButton(row.transform, "SpeedButton", "1x", 80f, 30f);
     }
 
+    private static void CreateColourRow(Transform parent, string name, string label)
+    {
+        GameObject labelRow = CreateRow(parent, name);
+        CreateRowLabel(labelRow.transform, label);
+        labelRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+
+        GameObject gridRow = new GameObject(name + "Grid", typeof(RectTransform), typeof(LayoutElement), typeof(GridLayoutGroup));
+        gridRow.transform.SetParent(parent, false);
+        gridRow.GetComponent<LayoutElement>().preferredHeight = 62f;
+
+        GridLayoutGroup grid = gridRow.GetComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(26f, 26f);
+        grid.spacing = new Vector2(8f, 8f);
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 9;
+        grid.childAlignment = TextAnchor.MiddleCenter;
+
+        string[] presets =
+        {
+            "34C2FF", "00A2FF", "4DC3FF", "00FFC8", "40FF90", "9CFF57", "F6FF4D", "FFCE3D", "FF9838",
+            "FF6A3D", "FF4D6D", "FF6AC8", "C86AFF", "8F7BFF", "6AA8FF", "FEFEFF", "C8D2E0", "8A93A6"
+        };
+
+        foreach (string hex in presets)
+        {
+            GameObject swatch = new GameObject("Swatch_" + hex, typeof(RectTransform));
+            swatch.transform.SetParent(gridRow.transform, false);
+            ChamferedImage swatchImage = swatch.AddComponent<ChamferedImage>();
+            swatchImage.Chamfer = 6f;
+            ColorUtility.TryParseHtmlString("#" + hex, out Color color);
+            swatchImage.color = color;
+            swatchImage.raycastTarget = true;
+            Button button = swatch.AddComponent<Button>();
+            button.targetGraphic = swatchImage;
+            button.transition = Button.Transition.None;
+        }
+    }
+
     private static void CreateValue(Transform row)
     {
-        GameObject box = new GameObject("Value", typeof(RectTransform), typeof(Image));
+        GameObject box = new GameObject("Value", typeof(RectTransform));
         box.transform.SetParent(row.transform, false);
-        box.GetComponent<Image>().color = HexlinkTheme.CellFrame;
+        ChamferedImage boxChamfer = box.AddComponent<ChamferedImage>();
+        boxChamfer.Chamfer = 8f;
+        boxChamfer.color = HexlinkTheme.CellFrame;
+        boxChamfer.raycastTarget = true;
         LayoutElement boxLE = box.AddComponent<LayoutElement>();
         boxLE.preferredWidth = 70f;
         boxLE.preferredHeight = 30f;
@@ -244,7 +301,7 @@ public static class OptionsScreenFactory
         GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(parent, false);
         Image image = button.GetComponent<Image>();
-        image.color = ControlColor;
+        image.color = HexlinkTheme.Ghost;
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
         buttonComponent.transition = Button.Transition.ColorTint;
@@ -277,7 +334,7 @@ public static class OptionsScreenFactory
         tmp.text = text;
         tmp.fontSize = Mathf.Max(8f, Mathf.Round(fontSize * GameOptions.UiScale));
         tmp.fontStyle = style;
-        tmp.color = TextColor;
+        tmp.color = HexlinkTheme.TextLight;
         tmp.alignment = TextAlignmentOptions.Center;
         go.AddComponent<LayoutElement>().preferredHeight = tmp.fontSize * 1.4f;
         return go;

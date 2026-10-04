@@ -11,7 +11,7 @@ public static class GridContextMenu
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
         if (canvas == null || entries == null || entries.Length == 0) return;
 
         GameObject root = new GameObject("GridContextMenu");
@@ -33,9 +33,12 @@ public static class GridContextMenu
         float entryHeight = 26f;
         float height = entries.Length * entryHeight + 8f;
 
-        GameObject panel = new GameObject("Panel", typeof(RectTransform), typeof(Image));
+        GameObject panel = new GameObject("Panel", typeof(RectTransform));
         panel.transform.SetParent(root.transform, false);
-        panel.GetComponent<Image>().color = HexlinkTheme.CellFrame;
+        ChamferedImage panelChamfer = panel.AddComponent<ChamferedImage>();
+        panelChamfer.Chamfer = 12f;
+        panelChamfer.color = HexlinkTheme.Border;
+        panelChamfer.raycastTarget = true;
         RectTransform panelRT = panel.GetComponent<RectTransform>();
 
         Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
@@ -54,7 +57,7 @@ public static class GridContextMenu
 
         GameObject inner = new GameObject("Inner", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup));
         inner.transform.SetParent(panel.transform, false);
-        inner.GetComponent<Image>().color = HexlinkTheme.CellFill;
+        inner.GetComponent<Image>().color = HexlinkTheme.Panel;
         RectTransform innerRT = inner.GetComponent<RectTransform>();
         innerRT.anchorMin = Vector2.zero;
         innerRT.anchorMax = Vector2.one;
@@ -76,6 +79,7 @@ public static class GridContextMenu
         }
 
         menuRoot = root;
+        ThemeSwitcher.ApplyToSubtree(root.transform);
     }
 
     public static void Close()
@@ -97,11 +101,8 @@ public static class GridContextMenu
 
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
-        ColorBlock colors = buttonComponent.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f);
-        colors.pressedColor = new Color(0.8f, 0.8f, 0.8f);
-        buttonComponent.colors = colors;
+        buttonComponent.transition = Button.Transition.ColorTint;
+        HexlinkTheme.ApplyHoverTint(buttonComponent);
         buttonComponent.onClick.AddListener(() => { Close(); action(); });
 
         GameObject text = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));

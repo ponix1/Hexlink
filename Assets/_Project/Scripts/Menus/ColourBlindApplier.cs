@@ -15,7 +15,7 @@ public static class ColourBlindApplier
     {
         if (!GameOptions.ColourBlindMode) return;
 
-        foreach (Button button in Object.FindObjectsByType<Button>(FindObjectsSortMode.None))
+        foreach (Button button in Object.FindObjectsByType<Button>())
         {
             if (button.transition != Button.Transition.ColorTint) continue;
 

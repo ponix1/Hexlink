@@ -18,7 +18,7 @@ public static class SolutionSessionSpawner
     {
         if (SceneManager.GetActiveScene().name != "Puzzle_Play") return;
 
-        Canvas canvas = Object.FindFirstObjectByType<Canvas>();
+        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
         if (canvas == null) return;
         if (canvas.transform.Find("SolutionSession") != null) return;
 
@@ -59,6 +59,8 @@ public static class SolutionSessionSpawner
         labelRT.anchorMax = Vector2.one;
         labelRT.offsetMin = Vector2.zero;
         labelRT.offsetMax = Vector2.zero;
+
+        ThemeSwitcher.ApplyToSubtree(button.transform);
     }
 }
 
@@ -78,8 +80,8 @@ public class SolutionSession : MonoBehaviour
 
     private IEnumerator Start()
     {
-        grid = FindFirstObjectByType<GridController>();
-        labelController = FindFirstObjectByType<HexTileLabelController>();
+        grid = FindAnyObjectByType<GridController>();
+        labelController = FindAnyObjectByType<HexTileLabelController>();
 
         // GridController restores the newest solution after one frame; wait two so
         // pending selections can replace it before auto-save engages.

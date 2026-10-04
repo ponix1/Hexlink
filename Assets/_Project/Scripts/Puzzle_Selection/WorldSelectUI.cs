@@ -97,6 +97,8 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
 
+        ThemeSwitcher.ApplyToSubtree(button.transform);
+
         return buttonComponent;
     }
 

@@ -5,13 +5,14 @@ using TMPro;
 
 public static class BackButtonSpawner
 {
-    private static readonly Color ControlColor = HexlinkTheme.Ghost;
-
     private static string BackTargetFor(string sceneName)
     {
         switch (sceneName)
         {
-            case "Puzzle_Play": return "Puzzle_Select";
+            case "Puzzle_Play":
+                return string.IsNullOrEmpty(PuzzleSelection.ReturnScene)
+                    ? "Puzzle_Select"
+                    : PuzzleSelection.ReturnScene;
             case "Puzzle_Select": return "Puzzle_Level";
             case "Level_Select": return "Puzzle_Level";
             case "Puzzle_Level": return "Main Menu";
@@ -28,10 +29,11 @@ public static class BackButtonSpawner
 
     private static void TrySpawn()
     {
-        string target = BackTargetFor(SceneManager.GetActiveScene().name);
+        string sceneName = SceneManager.GetActiveScene().name;
+        string target = BackTargetFor(sceneName);
         if (target == null) return;
 
-        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        Canvas[] canvases = Object.FindObjectsByType<Canvas>();
         foreach (Canvas canvas in canvases)
         {
             if (canvas.transform.Find("BackButton") != null) return;
@@ -51,7 +53,7 @@ public static class BackButtonSpawner
         GameObject button = new GameObject("BackButton", typeof(RectTransform), typeof(Image), typeof(Button));
         button.transform.SetParent(mainCanvas.transform, false);
         Image image = button.GetComponent<Image>();
-        image.color = ControlColor;
+        image.color = HexlinkTheme.Ghost;
         Button buttonComponent = button.GetComponent<Button>();
         buttonComponent.targetGraphic = image;
         HexlinkTheme.ApplyHoverTint(buttonComponent);
@@ -66,7 +68,7 @@ public static class BackButtonSpawner
         GameObject text = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         text.transform.SetParent(button.transform, false);
         TextMeshProUGUI tmp = text.GetComponent<TextMeshProUGUI>();
-        tmp.text = "\u2190 Back";
+        tmp.text = sceneName == "Puzzle_Play" ? "Leave" : "\u2190 Back";
         tmp.fontSize = Mathf.Max(8f, Mathf.Round(15f * GameOptions.UiScale));
         tmp.fontStyle = FontStyles.Bold;
         tmp.color = HexlinkTheme.TextLight;
@@ -80,5 +82,7 @@ public static class BackButtonSpawner
         SceneSwitcher switcher = button.AddComponent<SceneSwitcher>();
         switcher.sceneToLoad = target;
         buttonComponent.onClick.AddListener(switcher.LoadScene);
+
+        ThemeSwitcher.ApplyToSubtree(button.transform);
     }
 }
