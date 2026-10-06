@@ -1,7 +1,13 @@
+// HexTileSelector — the 3D board's input hub. Per-frame Physics raycast for hover,
+// click routing (palette placement vs. instruction authoring), middle-click removal,
+// plus the pulsing/lifted "authoring prompt" visuals and scriptable UI highlights.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+// All mouse input to the hex board flows through here. Hover tinting uses a
+// MaterialPropertyBlock (_BaseColor) so shared materials stay batched under URP;
+// placement/removal is delegated to BoardState, authoring goes via OnTileClicked.
 public class HexTileSelector : MonoBehaviour
 {
     [SerializeField] private Camera targetCamera;
@@ -15,10 +21,13 @@ public class HexTileSelector : MonoBehaviour
     // so this logic never depends on a fresh InfoTab rebuild.
     private GridController GridController => authoringController != null ? authoringController.GridController : null;
 
+    // Raised on left-click when no palette tile is selected (authoring subscribes).
     public event System.Action<HexCoord> OnTileClicked;
 
+    // URP lit shader color property; written via MaterialPropertyBlock, not materials.
     private static readonly int BaseColorID = Shader.PropertyToID("_BaseColor");
 
+    // Visual state of one hex currently owned by the authoring prompt (pulse + lift).
     private class AuthoringHex
     {
         public HexCoord Coord;
@@ -31,12 +40,17 @@ public class HexTileSelector : MonoBehaviour
     }
 
     private MaterialPropertyBlock propertyBlock;
+    // Hex under the mouse (null = none); click routing depends on it.
     private MeshRenderer hoveredRenderer;
+    // True while a scripted UI highlight (HighlightTile) owns the tint — hover stands down.
     private bool uiHighlightActive;
+    // Set only when we tinted the hover renderer, so we never wipe a tint we don't own.
     private bool hoverTintApplied;
 
     private readonly List<AuthoringHex> authoringHexes = new List<AuthoringHex>();
+    // Rest (spawn) positions per tile root, remembered so lifted tiles can glide home.
     private readonly Dictionary<Transform, Vector3> homePositions = new Dictionary<Transform, Vector3>();
+    // While true the authoring prompt owns tile colors — hover tracks but doesn't tint.
     private bool authoringPromptActive;
 
     private Color subjectBase = new Color(0.612f, 0.784f, 0.831f);
@@ -69,6 +83,7 @@ public class HexTileSelector : MonoBehaviour
 
     private void Update()
     {
+        // Selecting a palette tile mid-instruction cancels authoring — placement wins.
         if (authoringController != null && authoringController.IsBusy
             && inventoryUI != null && !string.IsNullOrEmpty(inventoryUI.CurrentSelectedTile))
         {
@@ -78,6 +93,7 @@ public class HexTileSelector : MonoBehaviour
         UpdateAuthoringPrompt();
         UpdateLiftManagement();
 
+        // Pointer is over uGUI — board hover and clicks stand down for this frame.
         if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
         {
             if (!uiHighlightActive) ClearHover();
@@ -119,8 +135,11 @@ public class HexTileSelector : MonoBehaviour
         }
     }
 
+    // Left-click: place the selected palette tile, or raise OnTileClicked for authoring.
+    // Middle-click: remove the hovered tile.
     private void CheckForClick()
     {
+        // Left-click on empty space exits instruction input mode.
         if (Input.GetMouseButtonDown(0) && hoveredRenderer == null)
         {
             if (authoringController != null)
@@ -150,6 +169,7 @@ public class HexTileSelector : MonoBehaviour
         if (Input.GetMouseButtonDown(0))
         {
             if (identity == null) return;
+            // LMB+RMB together is the camera-pan chord — don't treat as a click.
             if (Input.GetMouseButton(1)) return;
 
             bool authoringBusy = authoringController != null && authoringController.IsBusy;
@@ -168,6 +188,8 @@ public class HexTileSelector : MonoBehaviour
                 TileData existing = labelController.boardState.GetTile(identity.coordinate);
                 GridController grid = GridController;
 
+                // Replacing a tile that instructions reference needs a double-click:
+                // first click arms a pending change (yellow tint), second confirms.
                 if (GameOptions.ConfirmTileChanges && existing != null && grid != null && grid.HasInstructionsReferencing(identity.coordinate))
                 {
                     if (grid.IsPendingChange(identity.coordinate))
@@ -205,6 +227,7 @@ public class HexTileSelector : MonoBehaviour
         return 0;
     }
 
+    // Scripted highlight for UI tokens (not mouse-driven); hover must not fight it.
     public void HighlightTile(HexCoord coord)
     {
         if (authoringPromptActive) return;
@@ -219,12 +242,15 @@ public class HexTileSelector : MonoBehaviour
         uiHighlightActive = true;
     }
 
+    // Release the scripted highlight; hover re-acquires naturally afterwards.
     public void ClearTileHighlight()
     {
         uiHighlightActive = false;
         ClearHover();
     }
 
+    // (Re)builds the prompt visuals for the current authoring stage: subject-only
+    // (candidates == null) or a set of clickable candidates. Replaces any old prompt.
     public void ShowAuthoringPrompt(HexCoord subject, List<HexCoord> candidates)
     {
         ClearAuthoringPrompt();
@@ -293,6 +319,7 @@ public class HexTileSelector : MonoBehaviour
         Transform root = hexTile.transform;
         GetHomePosition(root);
 
+        // Dedupe by coord: re-showing a hex in a later stage refreshes it, not stacks it.
         authoringHexes.RemoveAll(existing => existing.Coord.Equals(coord));
         authoringHexes.Add(new AuthoringHex
         {
@@ -306,6 +333,8 @@ public class HexTileSelector : MonoBehaviour
         });
     }
 
+    // Animate prompt hexes: sine-pulse between base/pulse color (phase-staggered) and
+    // glide each root up to home + lift. ReducedMotion freezes both effects.
     private void UpdateAuthoringPrompt()
     {
         if (!authoringPromptActive) return;
@@ -385,6 +414,7 @@ public class HexTileSelector : MonoBehaviour
         }
     }
 
+    // The six hex neighbors of coord that actually have a spawned tile.
     public List<HexCoord> GetExistingNeighbors(HexCoord coord)
     {
         List<HexCoord> result = new List<HexCoord>();
@@ -399,6 +429,7 @@ public class HexTileSelector : MonoBehaviour
         return result;
     }
 
+    // Neighbors of coord that hold an operation tile (C-stage candidates).
     public List<HexCoord> GetAdjacentOperationTiles(HexCoord coord)
     {
         List<HexCoord> result = new List<HexCoord>();
@@ -414,6 +445,7 @@ public class HexTileSelector : MonoBehaviour
         return result;
     }
 
+    // Apply the hover tint via the property block and remember that we applied it.
     private void SetHover(MeshRenderer renderer)
     {
         renderer.GetPropertyBlock(propertyBlock);

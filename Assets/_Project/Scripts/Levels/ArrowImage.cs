@@ -10,6 +10,7 @@ public class ArrowImage : Graphic
         vh.Clear();
 
         Rect rect = GetPixelAdjustedRect();
+        // Tip at top centre; base pulled in 15% per side for a slimmer triangle.
         Vector2 tip = new Vector2(0f, rect.yMax);
         Vector2 baseLeft = new Vector2(rect.xMin + rect.width * 0.15f, rect.yMin);
         Vector2 baseRight = new Vector2(rect.xMax - rect.width * 0.15f, rect.yMin);

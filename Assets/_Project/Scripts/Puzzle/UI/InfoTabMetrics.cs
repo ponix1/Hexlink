@@ -1,3 +1,5 @@
+// InfoTabMetrics - live "Instr / Cycles / Procs" counter label above the grid,
+// refreshed from GridController.OnGridChanged.
 using UnityEngine;
 using TMPro;
 
@@ -14,6 +16,7 @@ public class InfoTabMetrics : MonoBehaviour
         }
         Refresh();
 
+        // Remove a "BestLabel" left over from an older scene layout.
         Transform stale = FindDeep(transform, "BestLabel");
         if (stale != null)
         {

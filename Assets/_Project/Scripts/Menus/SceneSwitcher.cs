@@ -1,3 +1,6 @@
+// SceneSwitcher: minimal "load this scene" button component. Kept tiny so scene buttons
+// can persist a target scene name and fire LoadScene from an onClick listener.
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
 

@@ -1,3 +1,8 @@
+// ThemeSwitcher: applies the active design (Dark / Light / Glass) to all UI at runtime.
+// Recolours every Graphic through the HexlinkTheme palette; in Glass mode additionally
+// converts panels/faces/buttons into translucent frosted surfaces with configurable
+// outlines (fully reversible via GlassMark).
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -36,6 +41,7 @@ public static class ThemeSwitcher
     // sliver of alpha so masks and clicks keep working.
     private static readonly Color Hidden = new Color(1f, 1f, 1f, 0.02f);
 
+    // Runtime-spawner pattern: re-apply per scene load so spawned UI is always themed.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -43,6 +49,8 @@ public static class ThemeSwitcher
         ApplyToScene();
     }
 
+    // Full-scene pipeline: toggle blur, undo any previous glass conversion, recolour
+    // every graphic + button tint, then re-convert to glass if theme 2 is active.
     public static void ApplyToScene()
     {
         int theme = GameOptions.ThemeIndex;
@@ -83,6 +91,7 @@ public static class ThemeSwitcher
         ColourBlindApplier.ApplyToScene();
     }
 
+    // Same pipeline scoped to one subtree (e.g. the runtime-built Options screen).
     public static void ApplyToSubtree(Transform root)
     {
         if (root == null) return;
@@ -385,6 +394,7 @@ public static class ThemeSwitcher
         return new Color(color.r, color.g, color.b, alpha);
     }
 
+    // Generic button surface: frosted backdrop + outline child; original graphic hidden.
     private static void ConvertButtonToFrost(Graphic graphic, Color outlineColor)
     {
         Image image = graphic as Image;
@@ -402,6 +412,7 @@ public static class ThemeSwitcher
         return 10f;
     }
 
+    // Stretched outline ring child: hexagon shape for sprite hexes, chamfered otherwise.
     private static GameObject CreateOutlineChild(Image image, bool hexagon, Color color, float chamfer)
     {
         GameObject outline = new GameObject("GlassOutline", typeof(RectTransform));
@@ -440,6 +451,7 @@ public static class ThemeSwitcher
         return false;
     }
 
+    // True when the graphic's colour matches any Glass-palette border-ish colour.
     private static bool IsBorderColored(Graphic graphic)
     {
         Color color = graphic.color;
@@ -455,6 +467,7 @@ public static class ThemeSwitcher
         return rect.width < 10f || rect.height < 10f;
     }
 
+    // Exact Color32 equality - palette detection needs bit-exact matches.
     private static bool SameColor(Color a, Color b)
     {
         Color32 ca = a;

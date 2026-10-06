@@ -1,20 +1,27 @@
+// WinPopup - victory dialog built procedurally on the scene canvas: metric table
+// (yours vs best, gold NEW BEST tags) plus Continue / Leave / optional Next level.
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
+// Static popup; Show() destroys any previous instance, Close() destroys the root.
 public static class WinPopup
 {
+    // Dialog and table layout constants.
     private const float PanelWidth = 520f;
     private const float PanelHeight = 430f;
     private const float NameWidth = 170f;
     private const float ValueWidth = 75f;
     private const float TagWidth = 115f;
 
+    // Accent for new-personal-best values and tags.
     private static readonly Color GoldColor = new Color(0.85f, 0.68f, 0.28f);
 
+    // Current popup instance (null when closed).
     private static GameObject root;
 
+    // Build and display the popup for a finished run's result.
     public static void Show(PuzzleRecords.Result result)
     {
         Close();
@@ -54,6 +61,7 @@ public static class WinPopup
         panelRT.offsetMin = new Vector2(4f, 4f);
         panelRT.offsetMax = new Vector2(-4f, -4f);
 
+        // "Next level" only appears when launched from Level_Select and a next level exists.
         bool levelMode = PuzzleSelection.ReturnScene == "Level_Select";
         PuzzleData nextLevel = null;
         if (levelMode) LevelProgress.TryGetNext(PuzzleSelection.SelectedPuzzle, out nextLevel);
@@ -113,6 +121,7 @@ public static class WinPopup
         CreateMetricRow(rows.transform, "Processors", result.Processors, result.PrevProcessors, result.NewProcessors);
         CreateMetricRow(rows.transform, "Sum", result.Sum, result.PrevSum, result.NewSum);
 
+        // Button row re-centers when "Next level" is absent.
         float continueX = nextLevel != null ? -160f : -80f;
         float leaveX = nextLevel != null ? 0f : 80f;
 
@@ -142,6 +151,7 @@ public static class WinPopup
         {
             PuzzleData next = nextLevel;
             GameObject nextButton = CreateButton(panel.transform, "NextLevelButton", "Next level", HexlinkTheme.Accent, HexlinkTheme.AccentText);
+            // Jump straight into the next level with a fresh (unsaved) solution slot.
             nextButton.GetComponent<Button>().onClick.AddListener(() =>
             {
                 Close();
@@ -167,6 +177,7 @@ public static class WinPopup
         }
     }
 
+    // Destroy the popup.
     public static void Close()
     {
         if (root != null)
@@ -191,6 +202,7 @@ public static class WinPopup
         return row;
     }
 
+    // Table header: Metric / Yours / Best / tag columns.
     private static void CreateHeaderRow(Transform parent)
     {
         GameObject row = CreateRow(parent, "Header", 24f);
@@ -212,6 +224,7 @@ public static class WinPopup
         tag.AddComponent<LayoutElement>().preferredWidth = TagWidth;
     }
 
+    // One metric line; gold value + NEW BEST tag when the run improved the record.
     private static void CreateMetricRow(Transform parent, string label, int yours, int best, bool improved)
     {
         GameObject row = CreateRow(parent, "Row_" + label, 34f);
@@ -251,11 +264,13 @@ public static class WinPopup
         return button;
     }
 
+    // int.MaxValue means "no record yet" - render an em dash.
     private static string Format(int value)
     {
         return value == int.MaxValue ? "\u2014" : value.ToString();
     }
 
+    // TMP label factory scaled by GameOptions.UiScale.
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -278,6 +293,7 @@ public static class WinPopup
         rt.offsetMax = Vector2.zero;
     }
 
+    // Unscaled-time fade/scale-in for the popup (skipped under Reduced Motion).
     private class Fader : MonoBehaviour
     {
         private CanvasGroup group;

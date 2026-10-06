@@ -1,9 +1,13 @@
+// OptionsMenuController: drives the factory-built Options screen - wires every control to
+// GameOptions (persisting on each change), handles live re-theming, opens/closes the modal.
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 public class OptionsMenuController : MonoBehaviour
 {
+    // Execution-speed cycle order; values and labels pair by index.
     private static readonly float[] SpeedValues = { 0.5f, 1f, 2f };
     private static readonly string[] SpeedLabels = { "0.5x", "1x", "2x" };
 
@@ -12,6 +16,9 @@ public class OptionsMenuController : MonoBehaviour
     private TextMeshProUGUI designLabel;
     private Transform rowsRoot;
 
+    // Runs on FIRST activation (the screen spawns inactive), so wiring waits until Open.
+    // All lookups go through FindDeep by name - hardcoded paths broke when the factory
+    // gained a Border layer.
     private void Start()
     {
         GameOptions.ApplySystemSettings();
@@ -75,17 +82,20 @@ public class OptionsMenuController : MonoBehaviour
         }
     }
 
+    // Invoked by the menu's Options button (listener added by the factory).
     public void Open()
     {
         gameObject.SetActive(true);
     }
 
+    // Persist all staged pref writes on the way out.
     public void Close()
     {
         GameOptions.Save();
         gameObject.SetActive(false);
     }
 
+    // Wraps through SpeedValues, persisting and relabelling each click.
     private void CycleSpeed()
     {
         speedIndex = (speedIndex + 1) % SpeedValues.Length;
@@ -99,6 +109,8 @@ public class OptionsMenuController : MonoBehaviour
         if (speedLabel != null) speedLabel.text = SpeedLabels[speedIndex];
     }
 
+    // Cycles Dark -> Light -> Glass, re-theming the whole scene live and toggling the
+    // Glass-only outline section.
     private void CycleDesign()
     {
         GameOptions.ThemeIndex = (GameOptions.ThemeIndex + 1) % HexlinkTheme.ThemeCount;
@@ -108,6 +120,7 @@ public class OptionsMenuController : MonoBehaviour
         SetGlassSectionVisible(GameOptions.ThemeIndex == 2);
     }
 
+    // Wires swatch clicks by parsing the hex out of each "Swatch_XXXXXX" name.
     private void WireGlassColourRow()
     {
         Transform gridRow = rowsRoot != null ? rowsRoot.Find("GlassColourRowGrid") : null;
@@ -131,6 +144,7 @@ public class OptionsMenuController : MonoBehaviour
         UpdateSwatchSelection(gridRow);
     }
 
+    // Moves the white "Sel" ring onto whichever swatch matches the saved colour.
     private static void UpdateSwatchSelection(Transform gridRow)
     {
         foreach (Transform swatch in gridRow)
@@ -139,6 +153,7 @@ public class OptionsMenuController : MonoBehaviour
 
             for (int i = swatch.childCount - 1; i >= 0; i--)
             {
+                // DestroyImmediate: rebuild + re-check happen in the same frame.
                 if (swatch.GetChild(i).name == "Sel") Object.DestroyImmediate(swatch.GetChild(i).gameObject);
             }
 
@@ -160,6 +175,7 @@ public class OptionsMenuController : MonoBehaviour
         }
     }
 
+    // Outline colour/opacity only affect the Glass design (theme index 2).
     private void SetGlassSectionVisible(bool visible)
     {
         if (rowsRoot == null) return;
@@ -176,6 +192,8 @@ public class OptionsMenuController : MonoBehaviour
         if (designLabel != null) designLabel.text = HexlinkTheme.ThemeName(GameOptions.ThemeIndex);
     }
 
+    // Wires a factory-built toggle row: knob POSITION (+/-12 x) carries the state, not
+    // colour alone - keeps the control readable in colour-blind mode.
     private void WireToggle(string rowName, System.Action<bool> setter, bool initial)
     {
         Transform row = rowsRoot != null ? rowsRoot.Find(rowName) : null;
@@ -202,6 +220,7 @@ public class OptionsMenuController : MonoBehaviour
         });
     }
 
+    // Wires a stepper row: clamps to [min,max], formats the value box, persists per click.
     private void WireStepper(string rowName, System.Action<float> setter, float initial, float step, float min, float max, string format)
     {
         Transform row = rowsRoot != null ? rowsRoot.Find(rowName) : null;
@@ -228,6 +247,7 @@ public class OptionsMenuController : MonoBehaviour
         });
     }
 
+    // Recursive by-name lookup; resilient to hierarchy changes (Border-layer past bug).
     private static Transform FindDeep(Transform parent, string name)
     {
         foreach (Transform child in parent)

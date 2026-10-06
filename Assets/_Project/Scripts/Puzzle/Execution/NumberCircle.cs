@@ -1,20 +1,29 @@
+// NumberCircle — the numeric value token that sits on hexes during execution.
+// Instantiated from the "Node" prefab at runtime; all motion/feedback is tweened
+// by coroutines that ExecutionEngine drives.
 using System.Collections;
 using UnityEngine;
 using TMPro;
 
+// Pure visual token: holds a coord + value and a 3D text label. The engine decides
+// where it moves; Spawn/MoveTo/pulse coroutines are animation only, no logic.
 public class NumberCircle : MonoBehaviour
 {
     [SerializeField] private float valueFontSize = 50f;
     [SerializeField] private float labelHeightOffset = -0.285f;
 
     private Extruded3DText labelText;
+    // Logical board position, kept in sync with the engine's occupancy dict.
     private HexCoord coord;
     private int value;
+    // Rest scale captured at Setup; every tween scales relative to it.
     private Vector3 targetScale;
 
     public HexCoord Coord => coord;
     public int Value => value;
 
+    // Build the value label: strip the label prefab down to its extruded TMP text and
+    // mount it in a counter-scale holder (details inline below).
     public void Setup(HexCoord startCoord, GameObject labelPrefab, float labelWorldScale)
     {
         coord = startCoord;
@@ -76,6 +85,7 @@ public class NumberCircle : MonoBehaviour
         }
     }
 
+    // Logical position only — the visual move happens via MoveTo.
     public void SetCoord(HexCoord newCoord)
     {
         coord = newCoord;
@@ -87,6 +97,7 @@ public class NumberCircle : MonoBehaviour
         if (labelText != null) labelText.SetText(value.ToString());
     }
 
+    // Pop-in: scale up from zero.
     public IEnumerator SpawnAnimation(float duration)
     {
         float t = 0f;
@@ -98,6 +109,7 @@ public class NumberCircle : MonoBehaviour
         }
     }
 
+    // Smoothstep position tween to a world position.
     public IEnumerator MoveTo(Vector3 worldTarget, float duration)
     {
         Vector3 start = transform.position;
@@ -110,6 +122,7 @@ public class NumberCircle : MonoBehaviour
         }
     }
 
+    // Brief bump when a merge result lands; ends back at rest scale.
     public IEnumerator MergePulse(float duration)
     {
         float t = 0f;
@@ -123,6 +136,7 @@ public class NumberCircle : MonoBehaviour
         transform.localScale = targetScale;
     }
 
+    // Triple-bounce celebration; deliberately ends 25% larger than rest scale.
     public IEnumerator WinPulse(float duration)
     {
         float t = 0f;

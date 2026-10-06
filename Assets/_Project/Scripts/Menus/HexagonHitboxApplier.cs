@@ -1,3 +1,7 @@
+// HexagonHitboxApplier: scene-wide hexagon hitboxes - on every scene load, alpha-tests
+// every readable sprite Image (transparent corners stop blocking clicks) and strips
+// raycast targets from button child graphics and TMP text (past-bug notes inside Apply).
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -5,8 +9,10 @@ using TMPro;
 
 public static class HexagonHitboxApplier
 {
+    // Just above zero: only (near-)fully transparent pixels are ignored.
     private const float AlphaThreshold = 0.01f;
 
+    // Runtime-spawner pattern: UI is built at runtime, so re-run after each scene load.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -14,6 +20,8 @@ public static class HexagonHitboxApplier
         Apply();
     }
 
+    // Pass 1: threshold every readable sprite - the alpha test needs CPU pixel access,
+    // so unreadable textures are skipped.
     private static void Apply()
     {
         foreach (Image image in Object.FindObjectsByType<Image>())
@@ -40,6 +48,8 @@ public static class HexagonHitboxApplier
             }
         }
 
+        // Stretched full-rect TMP labels formed invisible rectangle hitboxes over the
+        // hexagon buttons, bypassing the parent Image's alpha test - so no TMP raycasts.
         foreach (TextMeshProUGUI tmp in Object.FindObjectsByType<TextMeshProUGUI>())
         {
             tmp.raycastTarget = false;

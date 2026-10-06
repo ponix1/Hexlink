@@ -1,3 +1,7 @@
+// OptionsScreenFactory: runtime-builds the modal Options screen onto the Main Menu canvas.
+// Built entirely in code (runtime-spawner pattern) because editor-made scene UI kept
+// getting lost - this way the screen always materializes in play mode and builds.
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -5,11 +9,14 @@ using TMPro;
 
 public static class OptionsScreenFactory
 {
+    // Fixed panel / row layout dimensions.
     private const float PanelWidth = 490f;
     private const float PanelHeight = 858f;
     private const float RowHeight = 36f;
     private const float LabelWidth = 220f;
 
+    // Runtime-spawner pattern: retry on every scene load so the screen exists even when
+    // scene assets were edited/lost, and after returning to the menu from gameplay.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoSpawn()
     {
@@ -17,6 +24,7 @@ public static class OptionsScreenFactory
         TrySpawn();
     }
 
+    // Main Menu only. Destroys any stale copy first so rebuilds never stack duplicates.
     private static void TrySpawn()
     {
         if (SceneManager.GetActiveScene().name != "Main Menu") return;
@@ -34,6 +42,9 @@ public static class OptionsScreenFactory
         screen.SetActive(false);
     }
 
+    // Builds the whole screen: full-rect dim backdrop (click = close), chamfered
+    // Border > Panel, title, VerticalLayoutGroup of option rows, Close button.
+    // Returns the screen; the caller keeps it inactive until opened.
     public static GameObject Build(Canvas canvas)
     {
         GameObject screen = new GameObject("OptionsScreen", typeof(RectTransform), typeof(Image), typeof(Button));
@@ -48,6 +59,8 @@ public static class OptionsScreenFactory
         screenRT.offsetMin = Vector2.zero;
         screenRT.offsetMax = Vector2.zero;
 
+        // Border layer wraps the Panel. Adding this layer once broke hardcoded child
+        // paths elsewhere - which is why lookups use FindDeep, not fixed paths.
         GameObject border = new GameObject("Border", typeof(RectTransform));
         border.transform.SetParent(screen.transform, false);
         ChamferedImage borderChamfer = border.AddComponent<ChamferedImage>();
@@ -141,11 +154,14 @@ public static class OptionsScreenFactory
         closeRT.pivot = new Vector2(0.5f, 0f);
         closeRT.anchoredPosition = new Vector2(0f, 14f);
 
+        // Wire listeners in code: Inspector wiring would not survive runtime construction.
         OptionsMenuController controller = screen.AddComponent<OptionsMenuController>();
         backdropButton.onClick.AddListener(controller.Close);
 
+        // Theme the fresh subtree so it matches the active design immediately.
         ThemeSwitcher.ApplyToSubtree(screen.transform);
 
+        // Hook the menu's existing Options button via recursive name lookup.
         Transform optionsButton = FindDeep(canvas.transform, "Options");
         if (optionsButton != null)
         {
@@ -189,6 +205,7 @@ public static class OptionsScreenFactory
         label.AddComponent<LayoutElement>().preferredWidth = LabelWidth;
     }
 
+    // flexibleWidth=1 spacer pushes trailing controls to the row's right edge.
     private static void CreateSpacer(Transform row)
     {
         GameObject spacer = new GameObject("Spacer", typeof(RectTransform));
@@ -198,6 +215,8 @@ public static class OptionsScreenFactory
         le.preferredHeight = 0f;
     }
 
+    // Toggle = track + knob. The knob's POSITION carries the on/off state (moved by the
+    // controller), so state is never colour-only - colour-blind friendly.
     private static void CreateToggleRow(Transform parent, string name, string label)
     {
         GameObject row = CreateRow(parent, name);
@@ -224,6 +243,7 @@ public static class OptionsScreenFactory
         knobRT.anchoredPosition = new Vector2(-12f, 0f);
     }
 
+    // Classic stepper: label, spacer, Minus button, Value readout, Plus button.
     private static void CreateStepperRow(Transform parent, string name, string label)
     {
         GameObject row = CreateRow(parent, name);
@@ -234,6 +254,7 @@ public static class OptionsScreenFactory
         CreateControlButton(row.transform, "Plus", "+", 34f, 30f);
     }
 
+    // Execution speed uses a single cycling button instead of a stepper.
     private static void CreateSpeedRow(Transform parent)
     {
         GameObject row = CreateRow(parent, "SpeedRow");
@@ -242,6 +263,8 @@ public static class OptionsScreenFactory
         CreateControlButton(row.transform, "SpeedButton", "1x", 80f, 30f);
     }
 
+    // Glass outline colour picker: grid of preset swatches, each carrying its hex in its
+    // name ("Swatch_34C2FF") so the controller can parse and wire them.
     private static void CreateColourRow(Transform parent, string name, string label)
     {
         GameObject labelRow = CreateRow(parent, name);
@@ -280,6 +303,7 @@ public static class OptionsScreenFactory
         }
     }
 
+    // Readout box shown between the stepper's Minus/Plus buttons.
     private static void CreateValue(Transform row)
     {
         GameObject box = new GameObject("Value", typeof(RectTransform));
@@ -296,6 +320,7 @@ public static class OptionsScreenFactory
         Stretch(text.GetComponent<RectTransform>());
     }
 
+    // Ghost-styled button (hover tint included) with a stretched bold label.
     private static GameObject CreateControlButton(Transform parent, string name, string label, float width, float height)
     {
         GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -315,6 +340,7 @@ public static class OptionsScreenFactory
         return button;
     }
 
+    // Recursive by-name lookup. Hardcoded paths broke when the Border layer was added.
     private static Transform FindDeep(Transform parent, string name)
     {
         foreach (Transform child in parent)
@@ -326,6 +352,7 @@ public static class OptionsScreenFactory
         return null;
     }
 
+    // Shared TMP label helper; font size scales with the UiScale option (min 8).
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));

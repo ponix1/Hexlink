@@ -1,21 +1,33 @@
+// InstructionAuthoringController — the state machine that turns click/keypress input
+// into program instructions for the InfoTab (columns = time steps, rows = processors).
+// Consumes HexTileSelector clicks and writes finished instructions via GridController.
 using System.Collections.Generic;
 using UnityEngine;
 
+// State flow: Idle → SubjectSelected (click a tile) → AwaitingMoveTarget (Z) or
+// AwaitingOperationTile (C) → AwaitingOperands. Invalid clicks restart the subject
+// instead of dead-ending the flow.
 public class InstructionAuthoringController : MonoBehaviour
 {
     [SerializeField] private GridController gridController;
     [SerializeField] private HexTileLabelController labelController;
     [SerializeField] private HexTileSelector tileSelector;
 
+    // One value per authoring stage; transitions live in Update/HandleTileClicked.
     private enum State { Idle, SubjectSelected, AwaitingMoveTarget, AwaitingOperationTile, AwaitingOperands }
 
     private State state = State.Idle;
+    // Tile the instruction reads from / moves from.
     private HexCoord subject;
+    // The operator hex the subject merges onto.
     private HexCoord operationTile;
     private HexCoord moveTarget;
     private bool hasMoveTarget;
+    // List, not HashSet: insertion order = left-to-right evaluation order at runtime.
     private List<HexCoord> operands = new List<HexCoord>();
 
+    // True while an instruction is mid-authoring; HexTileSelector routes clicks to
+    // authoring (not placement) based on this.
     public bool IsBusy => state != State.Idle;
 
     // Tutorial read access: true after C was pressed and the operator tile
@@ -49,6 +61,8 @@ public class InstructionAuthoringController : MonoBehaviour
         tileSelector.OnTileClicked -= HandleTileClicked;
     }
 
+    // Global keys: Enter = new processor row, Escape = cancel everything.
+    // Per-state keys: Z/C/Space from SubjectSelected, D commits (see CommitPending).
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Return))
@@ -107,6 +121,7 @@ public class InstructionAuthoringController : MonoBehaviour
         }
     }
 
+    // Routes a 3D hex click (via HexTileSelector.OnTileClicked) through the states.
     private void HandleTileClicked(HexCoord coord)
     {
         switch (state)
@@ -186,6 +201,7 @@ public class InstructionAuthoringController : MonoBehaviour
                 }
                 else if (AreAdjacent(operationTile, coord))
                 {
+                    // Append order = evaluation order at runtime (see operands field).
                     operands.Add(coord);
                     if (tileSelector != null) tileSelector.ShowAuthoringPrompt(subject, GetOperandCandidates());
                     Debug.Log($"Operand added: {coord.q},{coord.r} ({operands.Count} total).");
@@ -198,6 +214,7 @@ public class InstructionAuthoringController : MonoBehaviour
         }
     }
 
+    // Still-clickable operands: op-tile neighbors minus subject and already-chosen ones.
     private List<HexCoord> GetOperandCandidates()
     {
         List<HexCoord> result = new List<HexCoord>();
@@ -212,6 +229,8 @@ public class InstructionAuthoringController : MonoBehaviour
         return result;
     }
 
+    // A click on an existing but invalid tile re-targets the subject instead of
+    // dead-ending; returns false for empty space so the caller can log the real miss.
     private bool TryRestartSubject(HexCoord coord)
     {
         if (labelController.boardState.GetTile(coord) == null) return false;
@@ -225,6 +244,7 @@ public class InstructionAuthoringController : MonoBehaviour
         return true;
     }
 
+    // D key: write the finished Move/Operation instruction into the selected cell.
     private void CommitPending()
     {
         if (state == State.AwaitingMoveTarget)
@@ -272,6 +292,7 @@ public class InstructionAuthoringController : MonoBehaviour
         if (tileSelector != null) tileSelector.ClearAuthoringPrompt();
     }
 
+    // Hex adjacency: b is one of a's six immediate neighbors.
     private bool AreAdjacent(HexCoord a, HexCoord b)
     {
         for (int i = 0; i < 6; i++)

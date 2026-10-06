@@ -8,14 +8,18 @@ using UnityEngine;
 // follow it with no per-frame code.
 public static class BlurBackdrop
 {
+    // Screen size divided by this = capture resolution; the tiny texture
+    // bilinear-upscaled gives a cheap blur with no post-processing pass.
     private const int Downsample = 24;
     private const int StrongDownsample = 48;
 
+    // Standard and extra-strong blur captures, plus the cameras rendering them.
     private static RenderTexture texture;
     private static RenderTexture strongTexture;
     private static Camera standardCamera;
     private static Camera strongCamera;
 
+    // Get (lazily creating) the backdrop texture; "strong" is the blurrier one.
     public static RenderTexture GetTexture(bool strong)
     {
         EnsureCreated();
@@ -52,6 +56,7 @@ public static class BlurBackdrop
         renderTexture = null;
     }
 
+    // Lazy init on first use.
     private static void EnsureCreated()
     {
         if (texture != null) return;
@@ -62,6 +67,7 @@ public static class BlurBackdrop
         strongCamera = CreateCamera(strongTexture);
     }
 
+    // Downsampled RT; the 4px floor keeps it valid on any window size.
     private static RenderTexture CreateTexture(int downsample)
     {
         RenderTexture renderTexture = new RenderTexture(
@@ -77,6 +83,8 @@ public static class BlurBackdrop
         return renderTexture;
     }
 
+    // Hidden camera rendering straight into the target RT; URP renders it
+    // automatically because it has a targetTexture.
     private static Camera CreateCamera(RenderTexture target)
     {
         GameObject cameraGO = new GameObject("BlurBackdropCamera")
@@ -91,6 +99,8 @@ public static class BlurBackdrop
         return camera;
     }
 
+    // Copy the main camera's pose, projection and culling so the capture
+    // matches what the player sees; parenting makes it follow for free.
     private static void AttachToMainCamera(Camera camera)
     {
         Camera main = Camera.main;

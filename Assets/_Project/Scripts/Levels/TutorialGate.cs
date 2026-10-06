@@ -1,8 +1,10 @@
+// Gameplay scripts call the *Allowed checks; TutorialRunner flips the flags per step.
 // Lock state for the Level 1 tutorial. While Active, the gated systems only
 // allow what the current step permits: one palette tile at a time, tile
 // placement vs authoring, the instruction hotkeys, and Play.
 public static class TutorialGate
 {
+    // Master switch: false (default) means everything is allowed.
     public static bool Active;
 
     public static string AllowedTile;        // normalized symbol; null = none
@@ -41,6 +43,7 @@ public static class TutorialGate
         return !Active || AllowPlay;
     }
 
+    // Restore full freedom (tutorial finished or skipped).
     public static void UnlockAll()
     {
         Active = false;

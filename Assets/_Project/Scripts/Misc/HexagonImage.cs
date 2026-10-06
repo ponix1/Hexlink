@@ -1,6 +1,9 @@
+// Custom UI graphic: a pointy-top hexagon, optionally drawn as an outline ring.
 using UnityEngine;
 using UnityEngine.UI;
 
+// Procedural hexagon replacement for UI Image: no sprite needed, and ring
+// mode gives clean hex outlines of any thickness.
 public class HexagonImage : Image
 {
     [SerializeField] private float outlineThickness = 0f;
@@ -28,6 +31,7 @@ public class HexagonImage : Image
         UIVertex vertex = UIVertex.simpleVert;
         vertex.color = color;
 
+        // Solid mode: centre vertex fanned out to the six corners.
         if (outlineThickness <= 0f)
         {
             Vector2[] outerPoints = HexPoints(center, outer);
@@ -46,6 +50,9 @@ public class HexagonImage : Image
             return;
         }
 
+        // Ring mode: stitch outer + inner hexagons into quad strips. Inner
+        // radius clamped to >= 25% of outer so a huge thickness can't invert
+        // the ring.
         float inner = Mathf.Clamp(outer - outlineThickness, outer * 0.25f, outer);
         Vector2[] outerRing = HexPoints(center, outer);
         Vector2[] innerRing = HexPoints(center, inner);

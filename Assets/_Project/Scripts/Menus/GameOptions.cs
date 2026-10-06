@@ -1,7 +1,11 @@
+// GameOptions: static, PlayerPrefs-backed store for all cross-scene settings (theme,
+// accessibility, camera, gameplay, system). Every setter persists immediately.
+
 using UnityEngine;
 
 public static class GameOptions
 {
+    // Namespaces every key so Hexlink prefs can't collide with other Unity prefs.
     private const string KeyPrefix = "Hexlink.";
 
     // 0 = Dark, 1 = Light, 2 = Glass. Migrates from the legacy LightTheme bool.
@@ -58,12 +62,15 @@ public static class GameOptions
         return true;
     }
 
+    // "ColourBlind2": the renamed key intentionally drops stale saved values left over
+    // from before the default changed.
     public static bool ColourBlindMode
     {
         get => PlayerPrefs.GetInt(KeyPrefix + "ColourBlind2", 0) == 1;
         set => PlayerPrefs.SetInt(KeyPrefix + "ColourBlind2", value ? 1 : 0);
     }
 
+    // "ReducedMotion2": same key-rename trick as ColourBlind2 to reset stale prefs.
     public static bool ReducedMotion
     {
         get => PlayerPrefs.GetInt(KeyPrefix + "ReducedMotion2", 0) == 1;
@@ -76,6 +83,7 @@ public static class GameOptions
         set => PlayerPrefs.SetInt(KeyPrefix + "ConfirmTileChanges", value ? 1 : 0);
     }
 
+    // Rare option that applies live: the setter pushes straight into QualitySettings.
     public static bool VSync
     {
         get => PlayerPrefs.GetInt(KeyPrefix + "VSync", 1) == 1;
@@ -104,17 +112,20 @@ public static class GameOptions
         set => PlayerPrefs.SetFloat(KeyPrefix + "UiScale", value);
     }
 
+    // Puzzle execution multiplier, clamped to 0.25x-3x.
     public static float ExecutionSpeed
     {
         get => PlayerPrefs.GetFloat(KeyPrefix + "ExecutionSpeed", 1f);
         set => PlayerPrefs.SetFloat(KeyPrefix + "ExecutionSpeed", Mathf.Clamp(value, 0.25f, 3f));
     }
 
+    // Flushes staged PlayerPrefs writes to disk (setters only cache until this or quit).
     public static void Save()
     {
         PlayerPrefs.Save();
     }
 
+    // Re-applies settings Unity doesn't persist between sessions (e.g. vSync count).
     public static void ApplySystemSettings()
     {
         QualitySettings.vSyncCount = VSync ? 1 : 0;

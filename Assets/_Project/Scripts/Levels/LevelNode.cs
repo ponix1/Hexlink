@@ -1,3 +1,5 @@
+// One level node's behaviour on the Level_Select map (visuals created by
+// LevelMapFactory): completion/current/lock states, hover tooltip, click-to-play.
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -31,8 +33,10 @@ public class LevelNode : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
     private TextMeshProUGUI checkLabel;
     private TextMeshProUGUI lockLabel;
     private RectTransform ownRect;
+    // Gentle scale pulse on the current unfinished level.
     private bool pulse;
 
+    // Apply state visuals: check/lock labels, alpha, ring colour, pulse, interactable.
     public void Setup(PuzzleData puzzleData, int levelIndex, bool nodeUnlocked, bool currentNode,
         ChamferedImage nodeFrame,
         TextMeshProUGUI number, TextMeshProUGUI check, TextMeshProUGUI lockText)
@@ -57,6 +61,7 @@ public class LevelNode : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         CanvasGroup group = GetComponent<CanvasGroup>();
         if (group != null) group.alpha = unlocked ? 1f : 0.45f;
 
+        // Ring: green = complete, pale blue = current, grey = otherwise.
         frame.color = complete ? CompleteGreen
             : unlocked && isCurrent ? RingCurrent
             : RingIdle;
@@ -64,6 +69,7 @@ public class LevelNode : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         GetComponent<Button>().interactable = unlocked;
     }
 
+    // Select this puzzle, offer the solution picker, then load Puzzle_Play.
     public void OnNodeClicked()
     {
         if (!unlocked || data == null) return;
@@ -93,12 +99,14 @@ public class LevelNode : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
         LevelTooltip.Hide();
     }
 
+    // Leaving the map must not leave a tooltip or pulse scale behind.
     private void OnDisable()
     {
         LevelTooltip.Hide();
         if (ownRect != null) ownRect.localScale = Vector3.one;
     }
 
+    // Subtle unscaled-time sine pulse; snaps back to scale 1 otherwise.
     private void Update()
     {
         if (!pulse)

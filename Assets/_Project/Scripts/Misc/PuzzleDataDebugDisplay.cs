@@ -1,14 +1,19 @@
+// Dev tool: OnGUI overlay that dumps the selected puzzle's fields via
+// reflection, to verify what a PuzzleData asset actually contains at runtime.
 using UnityEngine;
 using System.Reflection;
 using System.Text;
 using System.Collections;
 
+// Draws a box in the top-right corner listing the runtime type and all
+// public fields of PuzzleSelection.SelectedPuzzle.
 public class PuzzleDataDebugDisplay : MonoBehaviour
 {
     private const float BoxWidth = 320f;
     private const float BoxHeight = 260f;
     private const float Margin = 10f;
 
+    // IMGUI draw pass; runs every frame but is cheap enough for a debug box.
     void OnGUI()
     {
         PuzzleData data = PuzzleSelection.SelectedPuzzle;
@@ -53,6 +58,7 @@ public class PuzzleDataDebugDisplay : MonoBehaviour
         GUI.Label(new Rect(boxX + 10, boxY + 10, BoxWidth - 20, BoxHeight - 20), sb.ToString(), style);
     }
 
+    // Human-friendly value formatting for the dump.
     private string FormatValue(object value)
     {
         if (value == null) return "null";

@@ -1,3 +1,7 @@
+// Level 1 interactive tutorial. TutorialLauncher auto-spawns TutorialRunner in
+// Puzzle_Play for puzzle "L-1" (until completed once); TutorialRunner walks the
+// player through tiles, the instruction keys (SPACE/Z/C/D) and Play using step
+// popups, input gating via TutorialGate, and board-state validation.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -53,22 +57,32 @@ public class TutorialRunner : MonoBehaviour
     // Fixed blue outline so tutorial popups are instantly recognisable.
     private static readonly Color OutlineBlue = new Color(0.204f, 0.765f, 1f, 0.95f);
 
+    // One tutorial popup. ContinueButton steps advance on click; otherwise
+    // Done() is polled in Update until it returns true.
     private class Step
     {
+        // Popup body text.
         public string Text;
+        // Optional italic hint line.
         public string Hint;
+        // Anchor name: "BOARD", "GridPanel", "TilePalette" or "PlayButton".
         public string Anchor;
+        // True = show a Continue button; false = wait for Done.
         public bool ContinueButton;
+        // Applies this step's TutorialGate locks.
         public System.Action Locks;
+        // Completion predicate polled in Update.
         public System.Func<bool> Done;
     }
 
+    // Scene systems the tutorial observes, locks, and validates against.
     private Canvas canvas;
     private TileInventoryUI inventoryUI;
     private GridController grid;
     private HexTileLabelController labelController;
     private InstructionAuthoringController authoring;
 
+    // Popup UI pieces, built in BuildPopup.
     private GameObject popupRoot;
     private GameObject highlight;
     private TextMeshProUGUI bodyText;
@@ -77,9 +91,11 @@ public class TutorialRunner : MonoBehaviour
     private Button continueButton;
     private ArrowImage arrow;
 
+    // The scripted steps and the one currently shown (-1 = not started).
     private readonly List<Step> steps = new List<Step>();
     private int stepIndex = -1;
 
+    // Progress flags set by event handlers; reset per step (per run for Play steps).
     private bool executionStarted;
     private bool executionFinished;
     private bool puzzleWon;
@@ -87,12 +103,14 @@ public class TutorialRunner : MonoBehaviour
     private bool boardChangedSinceStep;
     private bool gridChangedSinceStep;
 
+    // Lock everything the instant the runner exists, before scene refs resolve.
     private void Awake()
     {
         TutorialGate.Active = true;
         LockAll();
     }
 
+    // Resolve refs (abort if missing), hook gameplay events, build steps + popup.
     private void Start()
     {
         canvas = FindAnyObjectByType<Canvas>();
@@ -153,6 +171,7 @@ public class TutorialRunner : MonoBehaviour
     private void OnGridChanged() { gridChangedSinceStep = true; }
     private void OnBoardChanged(HexCoord coord) { boardChangedSinceStep = true; }
 
+    // Unhook events; destroying the runner ends the tutorial without completing it.
     private void OnDestroy()
     {
         ExecutionEngine.ExecutionStarted -= OnExecutionStarted;
@@ -167,6 +186,7 @@ public class TutorialRunner : MonoBehaviour
         EndTutorial(false);
     }
 
+    // Poll the active step's Done predicate; run the idle pulse/breathe effects.
     private void Update()
     {
         if (stepIndex >= 0 && stepIndex < steps.Count && steps[stepIndex].Done != null)
@@ -188,6 +208,7 @@ public class TutorialRunner : MonoBehaviour
         }
     }
 
+    // Advance to the next step; running past the last one completes the tutorial.
     private void NextStep()
     {
         stepIndex++;
@@ -202,6 +223,7 @@ public class TutorialRunner : MonoBehaviour
         ApplyStep(steps[stepIndex]);
     }
 
+    // Reset progress flags, apply locks, refresh and position the popup.
     private void ApplyStep(Step step)
     {
         sawCellSelection = false;
@@ -221,6 +243,7 @@ public class TutorialRunner : MonoBehaviour
         ThemeSwitcher.ApplyToSubtree(popupRoot.transform);
     }
 
+    // Optionally mark done, release the gate, tear down popup and runner.
     private void EndTutorial(bool markCompleted)
     {
         if (markCompleted) TutorialLauncher.MarkTutorialCompleted();
@@ -239,6 +262,7 @@ public class TutorialRunner : MonoBehaviour
         SetLocks(null, false, false, false, false, false, false, false, false);
     }
 
+    // Write one step's permissions into the shared TutorialGate.
     private void SetLocks(string tile, bool placement, bool authoring, bool removal, bool play,
         bool space, bool operation, bool move, bool commit)
     {
@@ -256,6 +280,7 @@ public class TutorialRunner : MonoBehaviour
 
     // ----------------------------------------------------------- validation
 
+    // Count board tiles matching a predicate.
     private int CountTiles(System.Func<TileData, bool> match)
     {
         int count = 0;
@@ -276,6 +301,7 @@ public class TutorialRunner : MonoBehaviour
         return tile is OperationTileData && tile.GetDisplayValue() == "+";
     }
 
+    // True when a + tile is adjacent to both placed 1s.
     private bool PlusAdjacentToBothOnes()
     {
         HexCoord? plusCoord = null;
@@ -297,6 +323,7 @@ public class TutorialRunner : MonoBehaviour
         return true;
     }
 
+    // Axial hex-neighbour test (the six valid (dq,dr) offsets).
     private static bool IsAdjacent(HexCoord a, HexCoord b)
     {
         int dq = a.q - b.q;
@@ -306,6 +333,7 @@ public class TutorialRunner : MonoBehaviour
             || (dq == 1 && dr == -1) || (dq == -1 && dr == 1);
     }
 
+    // Locate the finish tile, if one has been placed.
     private bool HasFinalTile(out HexCoord finalCoord)
     {
         foreach (KeyValuePair<HexCoord, TileData> pair in labelController.boardState.AllTiles)
@@ -320,6 +348,7 @@ public class TutorialRunner : MonoBehaviour
         return false;
     }
 
+    // True when any authored Move instruction targets the finish tile.
     private bool HasMoveToFinal()
     {
         if (!HasFinalTile(out HexCoord finalCoord)) return false;
@@ -352,6 +381,7 @@ public class TutorialRunner : MonoBehaviour
         return false;
     }
 
+    // Count instructions of a type across every processor/column.
     private int CountInstructions<T>() where T : InstructionData
     {
         int count = 0;
@@ -367,6 +397,8 @@ public class TutorialRunner : MonoBehaviour
 
     // ----------------------------------------------------------------- steps
 
+    // The scripted sequence: each Step is one popup with its Locks (what input
+    // is allowed) and its Done test (what advances to the next popup).
     private void BuildSteps()
     {
         // ---- intro: name each part
@@ -499,6 +531,7 @@ public class TutorialRunner : MonoBehaviour
         {
             Text = "Press Play. The first two columns spawn nodes on both 1s. The third merges 1+1 into 2 and moves it onto the + tile.",
             Anchor = "PlayButton",
+            // Unlock only Play; reset engine flags so Done watches THIS run.
             Locks = () =>
             {
                 SetLocks(null, false, false, false, true, false, false, false, false);
@@ -577,6 +610,7 @@ public class TutorialRunner : MonoBehaviour
     }
     // ------------------------------------------------------------------- UI
 
+    // Construct the popup: border, panel, body/hint, Continue/Skip, waiting label, arrow.
     private void BuildPopup()
     {
         popupRoot = new GameObject("TutorialPopup", typeof(RectTransform));
@@ -662,6 +696,7 @@ public class TutorialRunner : MonoBehaviour
         arrowRT.sizeDelta = new Vector2(22f, 18f);
     }
 
+    // Procedural button helper; accent = filled style, else ghost style.
     private Button CreateButton(Transform parent, string name, string label, Vector2 position, float width, float height, bool accent)
     {
         GameObject buttonGO = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -690,6 +725,7 @@ public class TutorialRunner : MonoBehaviour
         return button;
     }
 
+    // Place the popup beside its anchor (right/above/below/left) and aim the arrow.
     private void PositionForAnchor(string anchorName)
     {
         RectTransform canvasRT = (RectTransform)canvas.transform;
@@ -816,6 +852,7 @@ public class TutorialRunner : MonoBehaviour
         return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
     }
 
+    // Accent ring around the anchored element; BOARD is world-space, so skip it.
     private void HighlightAnchor(string anchorName)
     {
         if (anchorName == "BOARD") return;
@@ -845,6 +882,7 @@ public class TutorialRunner : MonoBehaviour
         }
     }
 
+    // Depth-first search for a transform by name.
     private static Transform FindDeep(Transform parent, string name)
     {
         foreach (Transform child in parent)
@@ -856,6 +894,7 @@ public class TutorialRunner : MonoBehaviour
         return null;
     }
 
+    // Stretch a rect to fill its parent.
     private static void Stretch(RectTransform rt)
     {
         rt.anchorMin = Vector2.zero;

@@ -1,16 +1,22 @@
+// TileInventoryUI - palette model for the tile palette: tracks which tile symbol
+// (TileDataFactory format) is armed for placement and gates button availability.
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+// Selection state only; buttons call SelectTile and the engine listens to
+// OnTileSelected (used to auto-reset a running program).
 public class TileInventoryUI : MonoBehaviour
 {
     [Header("UI Elements")]
+    // Panel holding the Tile_* buttons, shown/hidden by TogglePanel.
     [SerializeField] private GameObject collapsiblePanel;
     [SerializeField] private TextMeshProUGUI currentSelectionText;
 
     // This holds the data for what we want to place (e.g., "7", "+", "_")
     public string CurrentSelectedTile { get; private set; } = "";
 
+    // Fired when a new symbol is armed; engine uses it for auto-reset.
     public event System.Action OnTileSelected;
 
     private bool isExpanded = true;
@@ -20,6 +26,7 @@ public class TileInventoryUI : MonoBehaviour
         RefreshPaletteAvailability();
     }
 
+    // Escape or right-click (without left held) deselects the armed tile.
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.Escape) || (Input.GetMouseButtonDown(1) && !Input.GetMouseButton(0)))
@@ -36,6 +43,7 @@ public class TileInventoryUI : MonoBehaviour
     }
 
     // Hook this up to all your individual tile buttons
+    // Arms a symbol (if available); re-clicking the same one toggles it off.
     public void SelectTile(string tileValue)
     {
         if (!IsTileAvailable(NormalizeSymbol(tileValue))) return;
@@ -57,6 +65,7 @@ public class TileInventoryUI : MonoBehaviour
         Debug.Log($"Inventory updated. Ready to place: {tileValue}");
     }
 
+    // Clears the armed symbol without firing OnTileSelected.
     public void DeselectTile()
     {
         if (CurrentSelectedTile == "") return;
@@ -68,6 +77,7 @@ public class TileInventoryUI : MonoBehaviour
         }
     }
 
+    // Enable/disable each Tile_* button per tutorial gate and puzzle restrictions.
     public void RefreshPaletteAvailability()
     {
         if (collapsiblePanel == null) return;
@@ -86,6 +96,8 @@ public class TileInventoryUI : MonoBehaviour
         }
     }
 
+    // Availability rules: tutorial gate first, then puzzle number list and
+    // disabled operations; the blank "_" is always allowed.
     private bool IsTileAvailable(string symbol)
     {
         if (TutorialGate.Active && !TutorialGate.TileAllowed(symbol)) return false;
@@ -113,6 +125,7 @@ public class TileInventoryUI : MonoBehaviour
         return true;
     }
 
+    // Map display glyphs back to TileDataFactory symbols.
     private static string NormalizeSymbol(string display)
     {
         switch (display)

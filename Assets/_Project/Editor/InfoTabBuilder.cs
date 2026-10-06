@@ -1,8 +1,18 @@
-﻿using UnityEngine;
+﻿// Editor-only builder (must live in an "Editor" folder). Menu: Hexlink/Build Info Tab.
+// Procedurally constructs the coding-interface tab UI in the open scene at edit time so the
+// UI is fully code-defined (versionable/reproducible); listeners are wired in code because
+// Inspector wiring doesn't survive Instantiate on prefab assets.
+
+using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
 using TMPro;
 
+// Builds the InfoTab: black-border/white-panel tab with a scrollable processor-x-timestep
+// grid grown at runtime from disabled template stamps, a right-edge ControlStrip
+// (Play/Pause/Step/Reset + speed slider + metrics) and a Hide collapse button. Attaches
+// GridController, InfoTabMetrics, InstructionAuthoringController and ExecutionEngine to the
+// InfoTab and wires every serialized reference via SerializedObject.
 public class InfoTabBuilder
 {
     // Shared sizing so header numbers line up with the cells beneath them.
@@ -26,6 +36,8 @@ public class InfoTabBuilder
     private static readonly Color AccentColor    = HexlinkTheme.Accent;
     private static readonly Color GhostButtonColor = HexlinkTheme.Ghost;
 
+    // Full-replace rebuild (NOT incremental): captures the old tab's rect, destroys it,
+    // regenerates the whole hierarchy, then wires the controllers below.
     [MenuItem("Hexlink/Build Info Tab")]
     public static void Build()
     {
@@ -42,6 +54,8 @@ public class InfoTabBuilder
         CellWidth = Mathf.Ceil(ChipSize * 4f + 16f);
         CellHeight = Mathf.Ceil(ChipSize * 2f + 14f);
 
+        // Upgrade legacy ConstantPixelSize canvases to ScaleWithScreenSize (1920x1080):
+        // constant pixel size made the UI render at wildly different sizes in fullscreen.
         CanvasScaler scaler = canvas.GetComponent<CanvasScaler>();
         if (scaler != null && scaler.uiScaleMode == CanvasScaler.ScaleMode.ConstantPixelSize)
         {
@@ -53,6 +67,8 @@ public class InfoTabBuilder
         }
 
         // Preserve the user's current InfoTab placement across rebuilds.
+        // Anchors/pivot/position/size are captured BEFORE the destroy and re-applied to the
+        // new root below, so a rebuild never moves or resizes the user's tab.
         RectTransform previousTab = canvas.transform.Find("InfoTab") as RectTransform;
         Vector2 savedAnchorMin = previousTab != null ? previousTab.anchorMin : new Vector2(0f, 0f);
         Vector2 savedAnchorMax = previousTab != null ? previousTab.anchorMax : new Vector2(1f, 0f);
@@ -122,6 +138,9 @@ public class InfoTabBuilder
         gridVLG.childAlignment = TextAnchor.UpperLeft;
         gridVLG.childForceExpandWidth = false;
         gridVLG.childForceExpandHeight = false;
+        // childControl=true so LayoutElement preferred sizes drive child sizing (all layout
+        // groups here do this; with childControl=false children once rendered at their raw
+        // 100x100 rects instead - past bug).
         gridVLG.childControlWidth = true;
         gridVLG.childControlHeight = true;
         gridVLG.spacing = 2f;
@@ -157,6 +176,9 @@ public class InfoTabBuilder
         headerSpacer.GetComponent<LayoutElement>().preferredWidth = RowLabelWidth;
 
         // --- HeaderCellTemplate: disabled stamp, duplicated per column into ColumnHeaderRow. ---
+        // Stamps stay disabled so they are excluded from layout; runtime Instantiates enabled
+        // copies (same pattern for every *Template below).
+
         GameObject headerCellTemplate = new GameObject("HeaderCellTemplate", typeof(RectTransform), typeof(LayoutElement));
         headerCellTemplate.transform.SetParent(gridContent.transform, false);
         LayoutElement headerCellLE = headerCellTemplate.GetComponent<LayoutElement>();
@@ -361,6 +383,8 @@ public class InfoTabBuilder
         speedLabelRT.sizeDelta = new Vector2(300f, 16f);
 
         GameObject speedSlider = CreateSlider(controlStrip.transform);
+        // Opportunistic repair: make sure HexTileSelector has its spawner reference, since
+        // every controller wired below talks to it.
         HexTileSelector selector = Object.FindFirstObjectByType<HexTileSelector>();
         if (selector != null)
         {
@@ -372,6 +396,9 @@ public class InfoTabBuilder
             }
         }
 
+        // Attach the runtime controllers to InfoTab and wire ALL serialized references via
+        // SerializedObject: edit-time serialization is what persists these references into
+        // the saved scene (runtime-assigned references would not survive).
         GridController gridController = infoTab.AddComponent<GridController>();
         SerializedObject gridSO = new SerializedObject(gridController);
         gridSO.FindProperty("labelController").objectReferenceValue = Object.FindFirstObjectByType<HexTileLabelController>();
@@ -421,6 +448,8 @@ public class InfoTabBuilder
         engineSO.FindProperty("speedLabel").objectReferenceValue = speedLabel.GetComponent<TextMeshProUGUI>();
         engineSO.FindProperty("inventoryUI").objectReferenceValue = Object.FindFirstObjectByType<TileInventoryUI>();
         engineSO.FindProperty("authoringController").objectReferenceValue = authoring;
+        // Prefab assets live outside the scene: nodePrefab is loaded by asset path, and the
+        // tile label prefab ref is copied from HexTileLabelController (single source of truth).
         engineSO.FindProperty("nodePrefab").objectReferenceValue = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/_Project/Prefabs/Node.prefab");
         SerializedObject labelControllerSO = new SerializedObject(labelController);
         engineSO.FindProperty("tileLabelPrefab").objectReferenceValue = labelControllerSO.FindProperty("tileLabelPrefab").objectReferenceValue;
@@ -433,6 +462,8 @@ public class InfoTabBuilder
                    "GridController + InstructionAuthoringController + ExecutionEngine attached to InfoTab with references wired.");
     }
 
+    // One control-strip button (Play/Pause/Step/Reset), stacked from the top of the strip
+    // via yOffset; primary=true renders it in the accent color.
     private static GameObject CreateStripButton(Transform parent, string name, string label, float yOffset, bool primary)
     {
         GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -461,6 +492,7 @@ public class InfoTabBuilder
         HexlinkTheme.ApplyHoverTint(button);
     }
 
+    // Hand-built Unity Slider hierarchy (background/fill/handle) for execution speed, 0.25x-3x.
     private static GameObject CreateSlider(Transform parent)
     {
         GameObject sliderGO = new GameObject("SpeedSlider", typeof(RectTransform), typeof(Slider));
@@ -531,6 +563,7 @@ public class InfoTabBuilder
         return sliderGO;
     }
 
+    // Legacy helper, currently unused by Build().
     private static GameObject CreateTabButton(Transform parent, string name, string label, Vector2 anchoredPosition)
     {
         GameObject button = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -565,6 +598,8 @@ public class InfoTabBuilder
         rt.offsetMax = Vector2.zero;
     }
 
+    // Creates a centered TMP label; font size scales with GameOptions.UiScale (min 8) so
+    // rebuilds pick up the Interface size option.
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));

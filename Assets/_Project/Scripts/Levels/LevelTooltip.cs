@@ -1,3 +1,5 @@
+// Static hover tooltip for Level_Select nodes: title, target, numbers and
+// available operations. Built procedurally once, then reused.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -5,6 +7,7 @@ using TMPro;
 
 public static class LevelTooltip
 {
+    // (pretty glyph, normalized key) pairs; disabledOperations stores keys.
     private static readonly (string display, string normalized)[] AllOperations =
     {
         ("+", "+"),
@@ -16,6 +19,7 @@ public static class LevelTooltip
         ("\u221A", "\u221A"),
     };
 
+    // Singleton UI instances, created on first Show.
     private static GameObject root;
     private static RectTransform rootRT;
     private static TextMeshProUGUI titleText;
@@ -23,6 +27,7 @@ public static class LevelTooltip
     private static TextMeshProUGUI numbersText;
     private static TextMeshProUGUI operationsText;
 
+    // Build once, fill, position over the node, activate.
     public static void Show(PuzzleData data, RectTransform anchor)
     {
         Canvas canvas = Object.FindAnyObjectByType<Canvas>();
@@ -42,6 +47,7 @@ public static class LevelTooltip
         if (root != null) root.SetActive(false);
     }
 
+    // Standard puzzles list their numbers/operations; others show "All".
     private static void Fill(PuzzleData data)
     {
         titleText.text = data.puzzleTitle;
@@ -60,6 +66,7 @@ public static class LevelTooltip
         }
     }
 
+    // All operations minus the disabled set; "All" again if nothing is disabled.
     private static string BuildOperationsText(StandardPuzzleData standard)
     {
         HashSet<string> disabled = new HashSet<string>();
@@ -80,6 +87,7 @@ public static class LevelTooltip
         return available.Count == AllOperations.Length ? "All" : string.Join(" ", available);
     }
 
+    // Map pretty glyphs to the normalized keys puzzles store.
     private static string NormalizeSymbol(string display)
     {
         switch (display)
@@ -90,6 +98,7 @@ public static class LevelTooltip
         }
     }
 
+    // Clamp inside the canvas; prefer 140px above the node, flip below if it won't fit.
     private static void PositionOver(RectTransform anchor)
     {
         RectTransform canvasRT = (RectTransform)root.transform.parent;
@@ -109,6 +118,7 @@ public static class LevelTooltip
         rootRT.anchoredPosition = new Vector2(x, y);
     }
 
+    // Construct the tooltip panel: four text lines plus a separator.
     private static void Build(Transform canvasTransform)
     {
         root = new GameObject("LevelTooltip", typeof(RectTransform));
@@ -159,6 +169,7 @@ public static class LevelTooltip
         rt.sizeDelta = new Vector2(290f, 26f);
     }
 
+    // TMP line helper; scales with UiScale, no wrapping.
     private static TextMeshProUGUI CreateLine(string name, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));

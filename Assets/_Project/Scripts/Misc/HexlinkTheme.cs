@@ -1,6 +1,11 @@
+// Central colour system: HexlinkPalette defines every colour by role, and
+// HexlinkTheme exposes the active palette (Dark/Light/Transparent) via
+// static accessors, including colour-blind variants and button hover tints.
 using UnityEngine;
 using UnityEngine.UI;
 
+// One complete palette. A plain class (not a ScriptableObject) because the
+// values are code-authored constants, not designer-tuned assets.
 public class HexlinkPalette
 {
     // Surfaces & chrome
@@ -20,6 +25,8 @@ public class HexlinkPalette
     public Color TextGray;
     public Color Accent;
     public Color AccentText;
+    // Hex strings of the two text colours, for rich-text tags that take
+    // text rather than a Color.
     public string TextLightHex;
     public string TextGrayHex;
 
@@ -52,6 +59,7 @@ public class HexlinkPalette
     public Color SelectedTileFill;
 
     // Button hover tint
+    // (multiplier tints: values >1 brighten the button's own texture)
     public Color HoverHighlight;
     public Color HoverPressed;
     public Color HoverDisabled;
@@ -59,6 +67,7 @@ public class HexlinkPalette
 
 public static class HexlinkTheme
 {
+    // Default slate-blue dark theme.
     public static readonly HexlinkPalette Dark = new HexlinkPalette
     {
         Border = new Color(0.165f, 0.176f, 0.204f),
@@ -108,6 +117,7 @@ public static class HexlinkTheme
         HoverDisabled = new Color(0.5f, 0.5f, 0.5f, 0.5f),
     };
 
+    // Soft light theme; hex equivalents noted inline for reference.
     public static readonly HexlinkPalette Light = new HexlinkPalette
     {
         Border = new Color(0.776f, 0.800f, 0.863f),        // #C6CCDC
@@ -157,6 +167,8 @@ public static class HexlinkTheme
         HoverDisabled = new Color(0.62f, 0.62f, 0.62f, 0.45f),
     };
 
+    // "Transparent" theme: near-zero-alpha fills with bright outlines, meant
+    // to sit over BlurBackdrop's frosted capture (design note below).
     public static readonly HexlinkPalette Glass = new HexlinkPalette
     {
         // Outline design: fills are fully transparent (alpha ~0; a sliver above
@@ -210,6 +222,8 @@ public static class HexlinkTheme
         HoverDisabled = new Color(0.5f, 0.5f, 0.5f, 0.35f),
     };
 
+    // One (dark, light, glass) triple per palette role. TryRemap uses these
+    // to retint palette colours baked into prefabs when the theme changes.
     private static readonly (Color dark, Color light, Color glass)[] RemapTriples =
     {
         (Dark.Border, Light.Border, Glass.Border),
@@ -248,8 +262,10 @@ public static class HexlinkTheme
         (Dark.SelectedTileFill, Light.SelectedTileFill, Glass.SelectedTileFill),
     };
 
+    // Number of themes, for the options UI's cycle control.
     public const int ThemeCount = 3;
 
+    // Display name per theme index.
     public static string ThemeName(int index)
     {
         switch (index)
@@ -260,6 +276,7 @@ public static class HexlinkTheme
         }
     }
 
+    // Active palette, driven by GameOptions.ThemeIndex.
     public static HexlinkPalette Current
     {
         get
@@ -273,6 +290,7 @@ public static class HexlinkTheme
         }
     }
 
+    // Convenience passthroughs so callers can write HexlinkTheme.X directly.
     public static Color Border => Current.Border;
     public static Color Panel => Current.Panel;
     public static Color Strip => Current.Strip;
@@ -299,6 +317,7 @@ public static class HexlinkTheme
     public static Color ChipOperand => Current.ChipOperand;
     public static Color SelectedTileFill => Current.SelectedTileFill;
 
+    // Grid state colours: swap to their colour-blind variants when enabled.
     public static Color SelectedFrame => GameOptions.ColourBlindMode ? Current.SelectedFrameCB : Current.SelectedFrame;
     public static Color SelectedFill => GameOptions.ColourBlindMode ? Current.SelectedFillCB : Current.SelectedFill;
     public static Color ErrorFrame => GameOptions.ColourBlindMode ? Current.ErrorFrameCB : Current.ErrorFrame;
@@ -306,6 +325,7 @@ public static class HexlinkTheme
     public static Color PendingFrame => GameOptions.ColourBlindMode ? Current.PendingFrameCB : Current.PendingFrame;
     public static Color PendingFill => GameOptions.ColourBlindMode ? Current.PendingFillCB : Current.PendingFill;
 
+    // Wire a UI Button's transition colours to the active palette.
     public static void ApplyHoverTint(Button button)
     {
         HexlinkPalette palette = Current;
@@ -319,6 +339,9 @@ public static class HexlinkTheme
         button.colors = colors;
     }
 
+    // If "color" exactly matches a known palette entry in any theme, output
+    // its equivalent in the target theme (retints existing assets); else
+    // leave it untouched and return false.
     public static bool TryRemap(Color color, int themeIndex, out Color remapped)
     {
         foreach ((Color dark, Color light, Color glass) triple in RemapTriples)
@@ -337,6 +360,7 @@ public static class HexlinkTheme
         return false;
     }
 
+    // Exact Color32 comparison — byte equality avoids float epsilon issues.
     private static bool Matches(Color a, Color b)
     {
         Color32 ca = a;

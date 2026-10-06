@@ -1,3 +1,6 @@
+// BackButtonSpawner: runtime-spawns a Back (or "Leave") button on every scene that has an
+// entry in the hardcoded back-navigation map, using a code-built SceneSwitcher.
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -5,6 +8,8 @@ using TMPro;
 
 public static class BackButtonSpawner
 {
+    // Hardcoded back-navigation map; null target = scene gets no Back button.
+    // Puzzle_Play normally returns to Puzzle_Select but honours a dynamic return scene.
     private static string BackTargetFor(string sceneName)
     {
         switch (sceneName)
@@ -20,6 +25,7 @@ public static class BackButtonSpawner
         }
     }
 
+    // Runtime-spawner pattern: the button must exist in play mode regardless of scene edits.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -27,6 +33,7 @@ public static class BackButtonSpawner
         TrySpawn();
     }
 
+    // Idempotent: bails if any canvas already carries a BackButton.
     private static void TrySpawn()
     {
         string sceneName = SceneManager.GetActiveScene().name;
@@ -39,6 +46,7 @@ public static class BackButtonSpawner
             if (canvas.transform.Find("BackButton") != null) return;
         }
 
+        // Attach to the first root canvas found.
         Canvas mainCanvas = null;
         foreach (Canvas canvas in canvases)
         {
@@ -68,6 +76,7 @@ public static class BackButtonSpawner
         GameObject text = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
         text.transform.SetParent(button.transform, false);
         TextMeshProUGUI tmp = text.GetComponent<TextMeshProUGUI>();
+        // Gameplay scene says "Leave"; menus get the usual back arrow.
         tmp.text = sceneName == "Puzzle_Play" ? "Leave" : "\u2190 Back";
         tmp.fontSize = Mathf.Max(8f, Mathf.Round(15f * GameOptions.UiScale));
         tmp.fontStyle = FontStyles.Bold;
@@ -79,6 +88,7 @@ public static class BackButtonSpawner
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
 
+        // Code wiring: runtime-built buttons can't rely on Inspector-assigned listeners.
         SceneSwitcher switcher = button.AddComponent<SceneSwitcher>();
         switcher.sceneToLoad = target;
         buttonComponent.onClick.AddListener(switcher.LoadScene);

@@ -1,3 +1,6 @@
+// SolutionSession - per-run solution manager: auto-saves grid/board edits into the
+// active solution slot (debounced), restores/switches solutions via the picker
+// popup, and marks them solved on win. Auto-spawned in Puzzle_Play scenes.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,8 +8,10 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
+// Boots the session plus a "Solutions" button onto the canvas of every scene.
 public static class SolutionSessionSpawner
 {
+    // Install the spawn hook for every scene load (and run it once now).
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
     {
@@ -14,6 +19,7 @@ public static class SolutionSessionSpawner
         Spawn();
     }
 
+    // Only in Puzzle_Play, and only once per canvas (idempotent).
     private static void Spawn()
     {
         if (SceneManager.GetActiveScene().name != "Puzzle_Play") return;
@@ -64,20 +70,28 @@ public static class SolutionSessionSpawner
     }
 }
 
+// Tracks the active solution slot and pushes edits to SolutionStore after a
+// short debounce; also owns opening the SolutionPickerPopup.
 public class SolutionSession : MonoBehaviour
 {
+    // Debounce window after the last edit before flushing to the store.
     private const float AutoSaveDelay = 1f;
 
     private GridController grid;
     private HexTileLabelController labelController;
+    // All saved solutions for this puzzle, in store order.
     private List<SavedSolution> entries = new List<SavedSolution>();
+    // Active slot in entries; -1 = fresh unsaved solution (first save creates it).
     private int index = -1;
+    // Guards programmatic wipes/applies so they never trigger auto-save.
     private bool suppressAutoSave;
+    // Edit pending + Time.time when the debounce started (-1 = idle).
     private bool dirty;
     private float saveQueuedAt = -1f;
 
     private string PuzzleID => PuzzleSelection.SelectedPuzzle != null ? PuzzleSelection.SelectedPuzzle.puzzleID : null;
 
+    // Bind scene refs, consume any pending slot choice, register auto-save hooks.
     private IEnumerator Start()
     {
         grid = FindAnyObjectByType<GridController>();
@@ -118,6 +132,7 @@ public class SolutionSession : MonoBehaviour
         if (labelController != null) labelController.boardState.OnCellChanged += QueueAutoSave;
     }
 
+    // Flush the queued auto-save once the debounce has elapsed.
     private void Update()
     {
         if (saveQueuedAt >= 0f && Time.time - saveQueuedAt >= AutoSaveDelay)
@@ -126,6 +141,7 @@ public class SolutionSession : MonoBehaviour
         }
     }
 
+    // Final flush + unhook on teardown.
     private void OnDisable()
     {
         FlushAutoSave();
@@ -133,6 +149,7 @@ public class SolutionSession : MonoBehaviour
         if (labelController != null) labelController.boardState.OnCellChanged -= QueueAutoSave;
     }
 
+    // Board-change adapter (event signature) for the parameterless queue.
     private void QueueAutoSave(HexCoord coord)
     {
         QueueAutoSave();
@@ -145,6 +162,7 @@ public class SolutionSession : MonoBehaviour
         saveQueuedAt = Time.time;
     }
 
+    // Persist now: update the active slot, or create a new one when index is -1.
     private void FlushAutoSave()
     {
         saveQueuedAt = -1f;
@@ -172,6 +190,7 @@ public class SolutionSession : MonoBehaviour
         }
     }
 
+    // Load the active entry into the grid without triggering auto-save.
     private void ApplyCurrent()
     {
         if (grid == null || index < 0 || index >= entries.Count) return;
@@ -184,6 +203,7 @@ public class SolutionSession : MonoBehaviour
         Debug.Log($"SolutionSession: applied '{entries[index].name}' ({index + 1}/{entries.Count}).");
     }
 
+    // Flush first, then show the picker; callbacks open/apply a choice or start fresh.
     public void OpenPopup()
     {
         if (PuzzleID == null || PuzzleSelection.SelectedPuzzle == null) return;
@@ -216,6 +236,7 @@ public class SolutionSession : MonoBehaviour
             });
     }
 
+    // Flag the active solution as solved in the store (called on win).
     public void MarkCurrentSolved()
     {
         if (PuzzleID == null) return;

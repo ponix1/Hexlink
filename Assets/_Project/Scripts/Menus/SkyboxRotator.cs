@@ -1,3 +1,5 @@
+// SkyboxRotator: menu ambience - continuously rotates the skybox's _Rotation over time.
+
 using UnityEngine;
 
 public class SkyboxRotator : MonoBehaviour

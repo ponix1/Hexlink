@@ -1,3 +1,7 @@
+// Editor-only builder (must live in an "Editor" folder). Menu: Hexlink/Build Back Button.
+// Builds a top-right Back button for the open scene using the back-navigation map below;
+// refuses on Main Menu (root screen) and in Play Mode.
+
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
@@ -9,6 +13,8 @@ public class BackButtonBuilder
 {
     private static readonly Color ControlColor = HexlinkTheme.Ghost;
 
+    // Scene back-navigation map: scene -> its parent. Main Menu is the root and returns
+    // null (no back target), which aborts the build.
     private static string BackTargetFor(string sceneName)
     {
         switch (sceneName)
@@ -21,6 +27,8 @@ public class BackButtonBuilder
         }
     }
 
+    // Full replace: any existing direct-child BackButton is destroyed first. Edit-time only
+    // (Play Mode edits cannot be saved).
     [MenuItem("Hexlink/Build Back Button")]
     public static void Build()
     {
@@ -81,6 +89,8 @@ public class BackButtonBuilder
         textRT.offsetMin = Vector2.zero;
         textRT.offsetMax = Vector2.zero;
 
+        // Persistent onClick listener (serialized with the scene); a runtime AddListener
+        // would be lost on scene save.
         SceneSwitcher switcher = button.AddComponent<SceneSwitcher>();
         switcher.sceneToLoad = target;
         UnityEventTools.AddPersistentListener(buttonComponent.onClick, switcher.LoadScene);

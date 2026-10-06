@@ -1,3 +1,7 @@
+// Editor-only (must live in an "Editor" folder). Menu: Hexlink/Build Options Screen (preview).
+// Thin preview wrapper around OptionsScreenFactory - the real options screen is spawned by
+// the Main Menu at runtime; this menu exists only for edit-time layout tweaking.
+
 using UnityEngine;
 using UnityEditor;
 
@@ -26,6 +30,7 @@ public class OptionsScreenBuilder
         }
 
         GameObject screen = OptionsScreenFactory.Build(canvas);
+        // Built inactive: this instance is a preview, not the live screen.
         screen.SetActive(false);
         Selection.activeGameObject = screen;
         Debug.Log("OptionsScreen preview built (for layout tweaking only). The real screen auto-spawns " +

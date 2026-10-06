@@ -1,7 +1,10 @@
+// Campaign progression: sequential unlock over GameContentRegistry.levels.
 using System.Collections.Generic;
 
+// Helpers for the level map: level N unlocks once level N-1 is complete.
 public static class LevelProgress
 {
+    // Campaign list from the registry (empty if content is missing).
     public static List<PuzzleData> GetLevels()
     {
         GameContentRegistry registry = GameContentRegistry.Load();
@@ -10,6 +13,7 @@ public static class LevelProgress
             : new List<PuzzleData>();
     }
 
+    // A level is unlocked if it's the first one or the previous one is done.
     public static bool IsUnlocked(int index)
     {
         List<PuzzleData> levels = GetLevels();
@@ -18,6 +22,7 @@ public static class LevelProgress
         return PuzzleProgress.IsComplete(levels[index - 1].puzzleID);
     }
 
+    // How many campaign levels are complete.
     public static int CompletedCount()
     {
         List<PuzzleData> levels = GetLevels();
@@ -41,6 +46,7 @@ public static class LevelProgress
         return -1;
     }
 
+    // Next level after "current", if it exists and is unlocked.
     public static bool TryGetNext(PuzzleData current, out PuzzleData next)
     {
         next = null;

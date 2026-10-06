@@ -1,3 +1,4 @@
+// The single world card in Puzzle_Select: displays the current world's name.
 using UnityEngine;
 using TMPro;
 

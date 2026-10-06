@@ -1,14 +1,22 @@
+// Puzzle card grid for the Puzzle_Select screen.
+// Spawns one card prefab per puzzle and keeps the ScrollRect/grid layout
+// scrollable and responsive to the viewport width.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
+// Fills the scrolling card grid; WorldSelectUI calls Populate on every world change.
 public class PuzzleGridUI : MonoBehaviour
 {
+    // ScrollRect content transform the cards are instantiated under.
     [SerializeField] private Transform contentParent;
+    // Card prefab instantiated once per puzzle (prefab cards, not procedural UI).
     [SerializeField] private PuzzleCardView cardPrefab;
 
+    // Cards from the last Populate, destroyed on the next rebuild.
     private List<GameObject> spawnedCards = new List<GameObject>();
 
+    // Rebuild the grid: clear old cards, spawn one card per puzzle.
     public void Populate(List<PuzzleData> puzzles)
     {
         EnsureScrollableContent();
@@ -27,6 +35,7 @@ public class PuzzleGridUI : MonoBehaviour
         }
     }
 
+    // Make the content rect grow with the grid so the parent ScrollRect can scroll.
     private void EnsureScrollableContent()
     {
         if (contentParent == null) return;
@@ -45,6 +54,7 @@ public class PuzzleGridUI : MonoBehaviour
         fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+        // Guarantee a usable scroll speed even if the authored value is tiny.
         ScrollRect scrollRect = rect.GetComponentInParent<ScrollRect>();
         if (scrollRect != null && scrollRect.scrollSensitivity < 60f)
         {
@@ -54,6 +64,7 @@ public class PuzzleGridUI : MonoBehaviour
         RefreshGridLayout();
     }
 
+    // Responsive layout: derive column count and cell size from the viewport width.
     private void RefreshGridLayout()
     {
         if (contentParent == null) return;
@@ -75,6 +86,8 @@ public class PuzzleGridUI : MonoBehaviour
         const float cardAspect = 232f / 340f;
         float available = scrollRect.viewport.rect.width - grid.padding.horizontal;
 
+        // Round to a column count; if that would stretch cards >25% too wide,
+        // spend the slack on one extra column instead.
         int columns = Mathf.Max(1, Mathf.RoundToInt(available / targetCardWidth));
         float cardWidth = (available - (columns - 1) * grid.spacing.x) / columns;
         if (cardWidth > targetCardWidth * 1.25f)

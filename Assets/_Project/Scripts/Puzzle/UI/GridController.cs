@@ -1,3 +1,8 @@
+// GridController - runtime brain of the InfoTab, the bottom-anchored spreadsheet UI
+// where columns are time steps, rows are processors, and each cell renders one
+// instruction as square token icons. The hierarchy is authored by InfoTabBuilder
+// (editor); this controller stamps rows/columns/cells at runtime and exposes the
+// program to the execution engine.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,10 +10,15 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
+// Builds the grid, manages selection/placement, renders tokens, tints cells for
+// errors and pending changes, animates collapse, and restores saved solutions.
 public class GridController : MonoBehaviour
 {
+    // Serialized refs and templates are wired by InfoTabBuilder at edit time.
     [SerializeField] private HexTileLabelController labelController;
+    // Highlights the 3D hex when one of its tokens is hovered.
     [SerializeField] private HexTileSelector tileSelector;
+    // Palette model; selecting a cell always deselects the current tile.
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private RectTransform gridContent;
 
@@ -16,19 +26,25 @@ public class GridController : MonoBehaviour
     // which graphics must not be structurally converted (they are repainted
     // by this controller on every state change).
     public RectTransform GridContentRoot => gridContent;
+    // Parent of the numbered column header cells.
     [SerializeField] private RectTransform columnHeaderRow;
+    // Disabled stamps cloned for every row / cell / header / token at runtime.
     [SerializeField] private GameObject processorRowTemplate;
     [SerializeField] private GameObject cellTemplate;
     [SerializeField] private GameObject headerCellTemplate;
     [SerializeField] private GameObject squareTokenTemplate;
     [SerializeField] private GameObject arrowTokenTemplate;
+    // Toggles tab collapse (height lerp toward CollapsedHeight).
     [SerializeField] private Button collapseButton;
 
+    // Theme shims for chip role colors (subject / operation / operand).
     private static Color ChipSubjectColor => HexlinkTheme.ChipSubject;
     private static Color ChipOperationColor => HexlinkTheme.ChipOperation;
     private static Color ChipOperandColor => HexlinkTheme.ChipOperand;
+    // Square tokens per visual row before wrapping inside a cell.
     private const int TokensPerRow = 4;
 
+    // Cell tint palette (selected / error / pending / running / hover / zebra).
     private Color selectedFrame => HexlinkTheme.SelectedFrame;
     private Color selectedFill => HexlinkTheme.SelectedFill;
     private Color errorFrame => HexlinkTheme.ErrorFrame;
@@ -43,8 +59,11 @@ public class GridController : MonoBehaviour
     private Color runningFill => HexlinkTheme.RunningFill;
     private Color headerTextColor => HexlinkTheme.TextGray;
 
+    // Board coord whose replacement is awaiting the yellow second-click confirm.
     private HexCoord? pendingChangeCoord;
 
+    // One instruction plus its grid address (Processor = row, Column = time step);
+    // the unit the execution engine consumes per column.
     public struct CellInstruction
     {
         public int Processor;
@@ -54,33 +73,44 @@ public class GridController : MonoBehaviour
 
     private const float CollapsedHeight = 30f;
 
+    // One processor: row root plus its cells in column order.
     private class ProcessorRow
     {
         public GameObject Root;
         public List<Cell> Cells = new List<Cell>();
     }
 
+    // Runtime state of a single cell: images, held instruction, UI flags.
     private class Cell
     {
         public Image FrameImage;
         public Image FillImage;
+        // Parent of the stamped token icons (destroyed and rebuilt on re-render).
         public RectTransform InstructionContainer;
         public InstructionData Instruction;
         public bool Hovered;
+        // Set by FlagError -> red tint until ClearErrors.
         public bool Error;
     }
 
+    // Processor rows in order (index = P label - 1).
     private List<ProcessorRow> rows = new List<ProcessorRow>();
+    // Column header labels (index = column number - 1).
     private List<TextMeshProUGUI> headerLabels = new List<TextMeshProUGUI>();
+    // Allocated columns; a trailing empty column is always kept for the next instruction.
     private int columnCount;
+    // Column the engine is currently executing (running tint), -1 when idle.
     private int activeColumn = -1;
+    // Collapse bookkeeping; height is lerped toward targetHeight in Update.
     private RectTransform tabRect;
     private TextMeshProUGUI collapseLabel;
     private bool collapsed;
     private float expandedHeight;
     private float targetHeight;
+    // Token row height, derived from the square token template's layout element.
     private float chipRowHeight = 32f;
 
+    // Selection cursor (tinted cell) where the next instruction will land.
     public int SelectedProcessor { get; private set; }
     public int SelectedColumn { get; private set; }
 
@@ -88,13 +118,16 @@ public class GridController : MonoBehaviour
     public int ProcessorCount => rows.Count;
     public int ColumnCount => columnCount;
 
+    // Single-cell read used by the tutorial system.
     public InstructionData GetInstructionAt(int processorIndex, int columnIndex)
     {
         Cell cell = GetCell(processorIndex, columnIndex);
         return cell != null ? cell.Instruction : null;
     }
 
+    // Fired when the selection cursor moves.
     public event System.Action OnCellSelected;
+    // Fired after any edit (place/clear/grow/wipe); metrics strip and auto-save listen.
     public event System.Action OnGridChanged;
 
     private void RaiseGridChanged()
@@ -102,6 +135,7 @@ public class GridController : MonoBehaviour
         OnGridChanged?.Invoke();
     }
 
+    // All instructions in one time-step column, in processor order - the engine's work for that step.
     public List<CellInstruction> GetColumnInstructions(int columnIndex)
     {
         List<CellInstruction> result = new List<CellInstruction>();
@@ -120,6 +154,7 @@ public class GridController : MonoBehaviour
         return result;
     }
 
+    // Live counters for the metrics strip; the trailing empty column is not a cycle.
     public void GetMetrics(out int instructions, out int cycles, out int processors)
     {
         instructions = 0;
@@ -144,6 +179,7 @@ public class GridController : MonoBehaviour
         cycles = lastUsedColumn + 1;
     }
 
+    // Tint a cell red after a runtime failure.
     public void FlagError(int processorIndex, int columnIndex)
     {
         Cell cell = GetCell(processorIndex, columnIndex);
@@ -154,6 +190,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Clear every red error tint.
     public void ClearErrors()
     {
         for (int p = 0; p < rows.Count; p++)
@@ -167,6 +204,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Capture heights, hook collapse, seed a 1x1 grid, select (0,0), queue solution restore.
     private void Start()
     {
         tabRect = (RectTransform)transform;
@@ -198,12 +236,14 @@ public class GridController : MonoBehaviour
         RestoreSavedSolution();
     }
 
+    // Expand to at least the requested size (never shrinks).
     public void GrowTo(int processorCount, int columnCountTarget)
     {
         while (rows.Count < processorCount) AddProcessorRow();
         while (columnCount < columnCountTarget) AddColumn();
     }
 
+    // Grow or shrink to exact dimensions, destroying surplus rows/columns/cells.
     public void ResizeTo(int processorCount, int columnCountTarget)
     {
         processorCount = Mathf.Max(1, processorCount);
@@ -246,6 +286,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Overwrite a cell's instruction and re-render its tokens (loading saved solutions).
     public void SetInstruction(int processorIndex, int columnIndex, InstructionData instruction)
     {
         Cell cell = GetCell(processorIndex, columnIndex);
@@ -260,6 +301,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Auto-restore the newest saved solution for the selected puzzle.
     private void RestoreSavedSolution()
     {
         if (PuzzleSelection.SelectedPuzzle == null) return;
@@ -271,6 +313,7 @@ public class GridController : MonoBehaviour
         Debug.Log($"Restored saved solution '{saved.name}' for '{saved.puzzleID}'.");
     }
 
+    // Wipe-and-replace: resize, clear board + grid, place saved tiles, then instructions.
     public void ApplySolution(SavedSolution saved)
     {
         if (saved == null) return;
@@ -304,6 +347,7 @@ public class GridController : MonoBehaviour
         SelectCell(0, 0);
     }
 
+    // Full wipe: instructions + board tiles + pending change; cursor back to (0,0).
     public void ClearAll()
     {
         WipeCurrent();
@@ -311,6 +355,7 @@ public class GridController : MonoBehaviour
         SelectCell(0, 0);
     }
 
+    // Destroy all tokens/instructions and remove every board tile.
     private void WipeCurrent()
     {
         for (int p = 0; p < rows.Count; p++)
@@ -335,6 +380,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Subscribe so tokens re-render when a referenced board tile changes.
     private void OnEnable()
     {
         if (labelController != null)
@@ -351,6 +397,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Re-render every instruction that references the changed board cell.
     private void HandleBoardCellChanged(HexCoord coord)
     {
         TileData changedTile = labelController.boardState.GetTile(coord);
@@ -375,6 +422,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // True if any placed instruction touches this coord (drives the replace-confirm flow).
     public bool HasInstructionsReferencing(HexCoord coord)
     {
         for (int p = 0; p < rows.Count; p++)
@@ -390,6 +438,7 @@ public class GridController : MonoBehaviour
         return false;
     }
 
+    // Arm the yellow confirm state: replacing this coord would affect existing instructions.
     public void SetPendingChange(HexCoord coord)
     {
         ClearPendingChange();
@@ -399,11 +448,13 @@ public class GridController : MonoBehaviour
         Debug.Log("This change affects existing instructions - click the tile again to confirm.");
     }
 
+    // True when coord is the one pending confirmation.
     public bool IsPendingChange(HexCoord coord)
     {
         return pendingChangeCoord.HasValue && pendingChangeCoord.Value.Equals(coord);
     }
 
+    // Disarm the confirm state and restore normal tints.
     public void ClearPendingChange()
     {
         if (!pendingChangeCoord.HasValue) return;
@@ -411,6 +462,7 @@ public class GridController : MonoBehaviour
         RefreshAllCellVisuals();
     }
 
+    // Repaint every cell after a global tint-state change.
     private void RefreshAllCellVisuals()
     {
         for (int p = 0; p < rows.Count; p++)
@@ -422,6 +474,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Repaint one cell; tint priority: error > pending > selected > running > hover > zebra.
     private void ApplyCellVisual(int p, int c)
     {
         Cell cell = GetCell(p, c);
@@ -467,6 +520,7 @@ public class GridController : MonoBehaviour
         cell.FillImage.color = fill;
     }
 
+    // Whether an instruction reads or writes the given hex coord.
     private static bool ReferencesCoord(InstructionData instruction, HexCoord coord)
     {
         if (instruction is MoveInstructionData move) return move.Source.Equals(coord) || move.Destination.Equals(coord);
@@ -478,6 +532,7 @@ public class GridController : MonoBehaviour
         return false;
     }
 
+    // Ease the tab height toward the collapse target.
     private void Update()
     {
         if (tabRect != null && Mathf.Abs(tabRect.sizeDelta.y - targetHeight) > 0.1f)
@@ -498,6 +553,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Stamp a processor row with one cell per existing column; right-click its label opens the row menu.
     public void AddProcessorRow()
     {
         GameObject rowObj = Instantiate(processorRowTemplate, gridContent);
@@ -526,6 +582,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Append a numbered column (header + cells); right-click the header opens the column menu.
     public void AddColumn()
     {
         columnCount++;
@@ -555,6 +612,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Row context menu: clear/delete this processor or clear everything.
     private void ShowProcessorMenu(int processorIndex, Vector2 position)
     {
         GridContextMenu.Show(position, new (string, System.Action)[]
@@ -565,6 +623,7 @@ public class GridController : MonoBehaviour
         });
     }
 
+    // Column context menu: clear/delete this column or clear everything.
     private void ShowColumnMenu(int columnIndex, Vector2 position)
     {
         GridContextMenu.Show(position, new (string, System.Action)[]
@@ -575,6 +634,7 @@ public class GridController : MonoBehaviour
         });
     }
 
+    // Empty every cell in a row but keep the row.
     public void ClearProcessorRow(int processorIndex)
     {
         if (processorIndex < 0 || processorIndex >= rows.Count) return;
@@ -586,6 +646,7 @@ public class GridController : MonoBehaviour
         ClearPendingChange();
     }
 
+    // Empty every cell in a column but keep the column.
     public void ClearColumn(int columnIndex)
     {
         if (columnIndex < 0 || columnIndex >= columnCount) return;
@@ -597,6 +658,7 @@ public class GridController : MonoBehaviour
         ClearPendingChange();
     }
 
+    // Empty all cells but keep the grid dimensions.
     public void ClearAllInstructions()
     {
         for (int p = 0; p < rows.Count; p++)
@@ -610,6 +672,7 @@ public class GridController : MonoBehaviour
         RefreshAllCellVisuals();
     }
 
+    // Remove a whole row (always keep >= 1) and renumber P labels.
     public void DeleteProcessorRow(int processorIndex)
     {
         if (rows.Count <= 1) return;
@@ -630,6 +693,7 @@ public class GridController : MonoBehaviour
         RefreshAllCellVisuals();
     }
 
+    // Remove a whole column (always keep >= 1) and renumber headers.
     public void DeleteColumn(int columnIndex)
     {
         if (columnCount <= 1) return;
@@ -685,6 +749,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Highlight the column the engine is executing (bold header + running fill).
     public void SetActiveColumn(int columnIndex)
     {
         ClearActiveColumn();
@@ -697,6 +762,7 @@ public class GridController : MonoBehaviour
         RefreshAllCellVisuals();
     }
 
+    // Clear the executing-column highlight.
     public void ClearActiveColumn()
     {
         if (activeColumn >= 0 && activeColumn < headerLabels.Count)
@@ -708,6 +774,7 @@ public class GridController : MonoBehaviour
         RefreshAllCellVisuals();
     }
 
+    // Stamp a cell: frame/fill images, left-click select, middle-click clear, hover tracking.
     private Cell CreateCell(ProcessorRow row, int processorIndex, int columnIndex)
     {
         GameObject cellObj = Instantiate(cellTemplate, row.Root.transform);
@@ -744,6 +811,7 @@ public class GridController : MonoBehaviour
         ApplyCellVisual(processorIndex, columnIndex);
     }
 
+    // Empty one cell (the middle-click path).
     public void ClearCell(int processorIndex, int columnIndex)
     {
         Cell cell = GetCell(processorIndex, columnIndex);
@@ -757,6 +825,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Move the cursor; also drops any palette selection so clicks don't place tiles.
     public void SelectCell(int processorIndex, int columnIndex)
     {
         if (inventoryUI != null) inventoryUI.DeselectTile();
@@ -773,6 +842,7 @@ public class GridController : MonoBehaviour
         OnCellSelected?.Invoke();
     }
 
+    // Clear the cursor without moving it.
     public void DeselectCell()
     {
         int prevP = SelectedProcessor;
@@ -782,6 +852,7 @@ public class GridController : MonoBehaviour
         ApplyCellVisual(prevP, prevC);
     }
 
+    // Commit an instruction: render tokens, auto-grow if in the last column, advance the cursor.
     public void PlaceInstruction(int processorIndex, int columnIndex, InstructionData instruction)
     {
         Cell cell = GetCell(processorIndex, columnIndex);
@@ -790,6 +861,7 @@ public class GridController : MonoBehaviour
         cell.Instruction = instruction;
         RenderInstruction(cell, instruction);
 
+        // Committing in the last column grows the grid so an empty next step always exists.
         if (columnIndex == columnCount - 1)
         {
             AddColumn();
@@ -798,6 +870,7 @@ public class GridController : MonoBehaviour
         RaiseGridChanged();
     }
 
+    // Empty all cells, keep dimensions, cursor back to (0,0).
     public void ClearGrid()
     {
         for (int p = 0; p < rows.Count; p++)
@@ -810,6 +883,7 @@ public class GridController : MonoBehaviour
         SelectCell(0, 0);
     }
 
+    // Mini flow-layout: wraps stamped tokens into rows of TokensPerRow inside a cell.
     private class TokenFlow
     {
         private readonly RectTransform container;
@@ -847,6 +921,8 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Compose the icon sequence: move = src->dst; select = {src}; op = src [op operand]*;
+    // square root is special-cased into a radical token.
     private void RenderInstruction(Cell cell, InstructionData instruction)
     {
         TokenFlow flow = new TokenFlow(cell.InstructionContainer, chipRowHeight);
@@ -882,6 +958,7 @@ public class GridController : MonoBehaviour
         }
     }
 
+    // Stamp one chip: tint by role, wire hover highlight, show the tile's value.
     private void SpawnSquareToken(TokenFlow flow, HexCoord coord, Color chipColor, string format = "{0}")
     {
         GameObject token = Instantiate(squareTokenTemplate, flow.NextSlot());
@@ -895,12 +972,14 @@ public class GridController : MonoBehaviour
         instructionToken.SetText(tile != null ? string.Format(format, tile.GetDisplayValue()) : "");
     }
 
+    // Arrow icon between a move's source and destination chips.
     private void SpawnArrowToken(TokenFlow flow)
     {
         GameObject token = Instantiate(arrowTokenTemplate, flow.NextSlot());
         token.SetActive(true);
     }
 
+    // Build the sqrt token (radical + chip + overline) procedurally - no template exists.
     private void SpawnSquareRootToken(TokenFlow flow, HexCoord coord)
     {
         RectTransform row = flow.NextSlot();
@@ -948,6 +1027,7 @@ public class GridController : MonoBehaviour
         overlineRT.anchoredPosition = Vector2.zero;
     }
 
+    // Bounds-checked cell access.
     private Cell GetCell(int processorIndex, int columnIndex)
     {
         if (processorIndex < 0 || processorIndex >= rows.Count) return null;
@@ -956,6 +1036,8 @@ public class GridController : MonoBehaviour
     }
 }
 
+// Forwards right/middle clicks and hover to assigned lambdas; uGUI Button only
+// reports left-clicks, so cells and headers use this for their extra interactions.
 public class CellClickHandler : MonoBehaviour, IPointerClickHandler, IPointerEnterHandler, IPointerExitHandler
 {
     public System.Action<PointerEventData> OnClick;

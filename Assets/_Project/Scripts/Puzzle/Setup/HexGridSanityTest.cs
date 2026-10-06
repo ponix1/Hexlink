@@ -1,5 +1,7 @@
 using UnityEngine;
 
+// Dev-only sanity check: spawns a center hex plus its six neighbours so
+// spacing/scale can be eyeballed. HexGridSpawner is the real gameplay spawner.
 public class HexGridSanityTest : MonoBehaviour
 {
     [SerializeField] private GameObject hexTilePrefab;

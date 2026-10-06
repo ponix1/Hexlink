@@ -1,9 +1,15 @@
+// Editor-only builder (must live in an "Editor" folder). Menu: Hexlink/Build Tile Palette.
+// Procedurally constructs the vertical top-left tile palette in the open scene at edit time.
+
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEditor;
 using UnityEditor.Events;
 using TMPro;
 
+// Builds the scrollable TilePalette (Numbers / Operations / Special sections, InfoTab-style
+// Hide/Show collapse) and wires it into the scene's existing TileInventoryUI, which remains
+// the runtime owner of the current tile selection.
 public class TilePaletteBuilder
 {
     private const float PanelWidth = 150f;
@@ -12,6 +18,8 @@ public class TilePaletteBuilder
     private const float GridPadding = 4f;
     private const float LabelHeight = 22f;
 
+    // Full-replace rebuild: preserves the current palette rect, destroys the old palette
+    // (plus legacy TilePanels/ToggleTabsButton and any duplicates), then reconstructs.
     [MenuItem("Hexlink/Build Tile Palette")]
     public static void Build()
     {
@@ -117,6 +125,8 @@ public class TilePaletteBuilder
         contentVLG.childAlignment = TextAnchor.UpperCenter;
         contentVLG.childForceExpandWidth = false;
         contentVLG.childForceExpandHeight = false;
+        // childControl=false is safe here: sections carry explicit sizeDelta rects (unlike
+        // InfoTab, where childControl=true is required for preferred-size-driven rows).
         contentVLG.childControlWidth = false;
         contentVLG.childControlHeight = false;
         contentVLG.spacing = 8f;
@@ -130,9 +140,12 @@ public class TilePaletteBuilder
         scrollRect.horizontal = false;
         scrollRect.vertical = true;
         scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        // Mouse-wheel sensitivity, tuned to 60.
         scrollRect.scrollSensitivity = 60f;
 
         // --- Sections (explicit sizes — no nested width-control chains). ---
+        // Tile entries are {display, symbol} pairs; symbols must match TileDataFactory's ids
+        // (multiply displays as the times glyph but maps to "*", divide to "/", radical literal).
         BuildSection(content.transform, "Numbers", inventoryUI,
             new string[][] { new[] {"0","0"}, new[] {"1","1"}, new[] {"2","2"}, new[] {"3","3"}, new[] {"4","4"},
                              new[] {"5","5"}, new[] {"6","6"}, new[] {"7","7"}, new[] {"8","8"}, new[] {"9","9"} });
@@ -168,6 +181,8 @@ public class TilePaletteBuilder
                    "InfoTab-style corner Hide/Show collapse button.");
     }
 
+    // One titled section: bold label + fixed 3-column GridLayoutGroup of tile buttons.
+    // Sizes are computed explicitly so no nested width-control chain is needed.
     private static void BuildSection(Transform content, string title, TileInventoryUI inventoryUI, string[][] tiles)
     {
         float innerWidth = PanelWidth - 10f;
@@ -207,6 +222,8 @@ public class TilePaletteBuilder
         }
     }
 
+    // A single palette cell: framed button + fill + bold label; clicking selects the tile
+    // via the persistent SelectTile listener below.
     private static void CreateTileButton(Transform parent, string display, string symbol, TileInventoryUI inventoryUI)
     {
         GameObject button = new GameObject("Tile_" + display, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -231,9 +248,11 @@ public class TilePaletteBuilder
         StretchFull(label.GetComponent<RectTransform>());
 
         // Persistent listener so it survives scene save; runtime AddListener would not.
+        // UnityEventTools serializes the call into the button's onClick in the scene.
         UnityEventTools.AddStringPersistentListener(buttonComponent.onClick, inventoryUI.SelectTile, symbol);
     }
 
+    // Centered TMP label; font size scales with GameOptions.UiScale (min 8).
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));

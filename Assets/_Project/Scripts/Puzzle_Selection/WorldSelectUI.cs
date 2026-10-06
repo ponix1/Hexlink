@@ -1,3 +1,5 @@
+// World navigation for Puzzle_Select: shows the current world's card and
+// puzzle grid; ‹ › buttons and A/D keys switch between worlds.
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -6,15 +8,21 @@ using System.Collections.Generic;
 
 public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler
 {
+    // All worlds; replaced at Start from GameContentRegistry (Hexlink/Sync World Content).
     public List<WorldData> worlds;
     public WorldCardUI worldCard;   // the ONE card object, dragged in directly
+    // Grid repopulated whenever the displayed world changes.
     public PuzzleGridUI puzzleGrid;
 
+    // Index into worlds of the currently displayed world.
     private int currentIndex = 0;
+    // Hover flag; written here but not currently read elsewhere.
     private bool isHovering = false;
+    // ‹ › nav buttons created in code; hidden at the ends of the list.
     private Button prevButton;
     private Button nextButton;
 
+    // Load the world list from the registry, build nav buttons, show world 0.
     void Start()
     {
         GameContentRegistry registry = GameContentRegistry.Load();
@@ -33,12 +41,14 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         UpdateDisplay();
     }
 
+    // A/D keys navigate worlds (legacy Input Manager).
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.D)) ChangeWorld(1);
         if (Input.GetKeyDown(KeyCode.A)) ChangeWorld(-1);
     }
 
+    // Step by +/-1; silently clamped to the list bounds.
     public void ChangeWorld(int direction)
     {
         int newIndex = currentIndex + direction;
@@ -48,6 +58,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         UpdateDisplay();
     }
 
+    // Refresh card + grid; hide the nav button past either end of the list.
     void UpdateDisplay()
     {
         worldCard.Setup(worlds[currentIndex]);
@@ -57,6 +68,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         if (nextButton != null) nextButton.gameObject.SetActive(currentIndex < worlds.Count - 1);
     }
 
+    // Create the two corner-anchored nav buttons procedurally.
     private void BuildNavigation()
     {
         prevButton = CreateNavButton("<", new Vector2(15.5f, -15.5f), new Vector2(0f, 1f), new Vector2(0f, 1f));
@@ -66,6 +78,7 @@ public class WorldSelectUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHa
         nextButton.onClick.AddListener(() => ChangeWorld(1));
     }
 
+    // Build a ghost-styled button with a bold TMP label at a canvas corner.
     private Button CreateNavButton(string label, Vector2 position, Vector2 anchor, Vector2 pivot)
     {
         GameObject button = new GameObject("NavButton_" + label, typeof(RectTransform), typeof(Image), typeof(Button));

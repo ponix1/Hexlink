@@ -1,8 +1,12 @@
+// Custom UI graphic: a chamfered rectangle (octagon), optionally an outline ring.
 using UnityEngine;
 using UnityEngine.UI;
 
+// Procedural rounded-corner-ish rectangle for UI Image: corners cut at 45
+// degrees; outline mode draws it as a hollow frame instead of a solid fill.
 public class ChamferedImage : Image
 {
+    // Corner cut length in pixels.
     [SerializeField] private float chamfer = 18f;
     [SerializeField] private float outlineThickness = 0f;
 
@@ -41,6 +45,7 @@ public class ChamferedImage : Image
             return;
         }
 
+        // Solid mode: centre vertex fanned out to the octagon corners.
         Vector2[] points = Octagon(rect.xMin, rect.xMax, rect.yMin, rect.yMax, c);
 
         UIVertex centerVertex = UIVertex.simpleVert;
@@ -62,6 +67,8 @@ public class ChamferedImage : Image
         }
     }
 
+    // Ring mode: stitch outer + inner octagons into quad strips; the inner
+    // chamfer shrinks with the thickness so the frame keeps 45-degree corners.
     private void PopulateOutline(VertexHelper vh, Rect rect, float c)
     {
         float t = Mathf.Clamp(outlineThickness, 0f, Mathf.Min(rect.width, rect.height) * 0.5f);
@@ -91,6 +98,7 @@ public class ChamferedImage : Image
         }
     }
 
+    // Eight points of the chamfered rect, clockwise from the top edge.
     private static Vector2[] Octagon(float xMin, float xMax, float yMin, float yMax, float c)
     {
         return new Vector2[]

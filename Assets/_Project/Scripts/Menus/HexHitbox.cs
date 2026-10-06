@@ -1,3 +1,6 @@
+// HexHitbox: per-object hexagon hitbox - hex buttons ignore clicks on their transparent
+// corners (requires the sprite's texture to be readable). Scene-wide variant: HexagonHitboxApplier.
+
 using UnityEngine;
 using UnityEngine.UI;
 

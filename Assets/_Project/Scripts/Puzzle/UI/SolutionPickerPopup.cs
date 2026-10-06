@@ -1,28 +1,39 @@
+// SolutionPickerPopup - modal listing every saved solution for the current puzzle
+// as selectable tiles with computed metrics; supports Open / New / Rename /
+// two-step Delete / Return. Built procedurally; callbacks route to SolutionSession.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+// Static UI: all state below is static and fully cleared on Close().
 public static class SolutionPickerPopup
 {
+    // Panel and solution-tile layout constants.
     private const float PanelWidth = 940f;
     private const float PanelHeight = 520f;
     private const float TileWidth = 420f;
     private const float TileHeight = 96f;
 
+    // Frame/name accent for solved solutions.
     private static readonly Color SolvedGreen = new Color(0.30f, 0.78f, 0.47f);
 
     private static string GrayHex => HexlinkTheme.TextGrayHex;
     private static string LightHex => HexlinkTheme.TextLightHex;
 
+    // Context and callbacks captured from SolutionSession while the popup is open.
     private static PuzzleData puzzle;
     private static System.Action<int> onOpen;
     private static System.Action onNew;
     private static GameObject root;
+    // Store snapshot rendered as tiles.
     private static readonly List<SavedSolution> entries = new List<SavedSolution>();
+    // Tile currently highlighted; gates Open/Rename/Delete.
     private static int selectedIndex = -1;
+    // First Delete press timestamp - a second press within 4s actually deletes.
     private static float deleteArmedAt = -100f;
 
+    // Rebuilt controls cached so Refresh() can update them.
     private static Transform gridContent;
     private static Button openButton;
     private static Button renameButton;
@@ -32,6 +43,7 @@ public static class SolutionPickerPopup
     private static GameObject renameRow;
     private static TMP_InputField renameInput;
 
+    // (Re)build the whole popup; clicking the backdrop closes it.
     public static void Show(PuzzleData puzzleData, System.Action<int> openHandler, System.Action newHandler)
     {
         Close();
@@ -201,6 +213,7 @@ public static class SolutionPickerPopup
         ThemeSwitcher.ApplyToSubtree(root.transform);
     }
 
+    // Destroy the popup and clear all static state.
     public static void Close()
     {
         if (root != null)
@@ -223,6 +236,7 @@ public static class SolutionPickerPopup
         renameInput = null;
     }
 
+    // Rebuild the tile list from the store and refresh button enabled states.
     private static void Refresh()
     {
         if (root == null || puzzle == null) return;
@@ -263,6 +277,7 @@ public static class SolutionPickerPopup
         ThemeSwitcher.ApplyToSubtree(root.transform);
     }
 
+    // Disable + visually fade buttons that require a selection.
     private static void SetButtonDim(Button button, bool enabled)
     {
         if (button == null) return;
@@ -273,6 +288,7 @@ public static class SolutionPickerPopup
         group.alpha = enabled ? 1f : 0.4f;
     }
 
+    // One solution tile: name (checkmark if solved), computed metrics; click selects it.
     private static void CreateTile(Transform parent, int index, SavedSolution entry)
     {
         bool selected = index == selectedIndex;
@@ -331,6 +347,7 @@ public static class SolutionPickerPopup
         metricsRT.sizeDelta = new Vector2(-16f, 26f);
     }
 
+    // Hidden inline rename row: input field + Confirm/Cancel (shown by RenameClicked).
     private static void BuildRenameRow(Transform panel)
     {
         renameRow = new GameObject("RenameRow", typeof(RectTransform));
@@ -408,6 +425,7 @@ public static class SolutionPickerPopup
         Refresh();
     }
 
+    // Close first, then hand the chosen index to the session via onOpen.
     private static void OpenClicked()
     {
         if (selectedIndex < 0 || selectedIndex >= entries.Count) return;
@@ -417,6 +435,7 @@ public static class SolutionPickerPopup
         handler?.Invoke(index);
     }
 
+    // Close first, then let the session start a fresh unsaved solution.
     private static void NewClicked()
     {
         System.Action handler = onNew;
@@ -424,6 +443,7 @@ public static class SolutionPickerPopup
         handler?.Invoke();
     }
 
+    // Show the rename row prefilled with the selected entry's name.
     private static void RenameClicked()
     {
         if (selectedIndex < 0 || selectedIndex >= entries.Count) return;
@@ -434,6 +454,7 @@ public static class SolutionPickerPopup
         renameInput.ActivateInputField();
     }
 
+    // Commit the rename to the store and refresh the list.
     private static void ConfirmRename()
     {
         if (renameInput == null || puzzle == null) return;
@@ -451,6 +472,7 @@ public static class SolutionPickerPopup
         if (renameRow != null) renameRow.SetActive(false);
     }
 
+    // Two-step delete: first press arms "Sure?" for 4s, second press deletes.
     private static void DeleteClicked()
     {
         if (puzzle == null) return;
@@ -498,6 +520,7 @@ public static class SolutionPickerPopup
         return button;
     }
 
+    // TMP label factory scaled by GameOptions.UiScale.
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -512,6 +535,7 @@ public static class SolutionPickerPopup
         return go;
     }
 
+    // "label value" rich-text pair; em dash when the value means "no record".
     private static string Value(string label, int value)
     {
         string text = value == int.MaxValue ? "\u2014" : value.ToString();

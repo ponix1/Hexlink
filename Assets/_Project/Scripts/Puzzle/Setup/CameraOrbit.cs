@@ -1,19 +1,25 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+// Rig-based camera: this transform is the orbit pivot (kept at board centre);
+// the child Camera orbits/zooms around it. Right-drag = orbit, LMB+RMB = pan,
+// F = recenter, scroll = zoom. Uses legacy Input Manager axes.
 public class CameraOrbit : MonoBehaviour
 {
     [SerializeField] private Vector3 boardCenter = Vector3.zero;
     [SerializeField] private KeyCode recenterKey = KeyCode.F;
+    // Projection-skew amount that shifts the board above screen centre (see Start).
     [SerializeField] private float screenShift = 0.3f;
     [SerializeField] private float zoomSpeed = 8f;
     [SerializeField] private float minDistance = 3f;
     [SerializeField] private float maxDistance = 30f;
 
+    // Orbit angles tracked manually so we never re-read wrapped euler values.
     private float currentHorizontalAngle;
     private float currentVerticalAngle;
     private Camera childCamera;
 
+    // Seeds the angles from the rig's authored rotation, then locks the camera onto the rig.
     private void Start()
     {
         currentHorizontalAngle = transform.eulerAngles.y;
@@ -34,6 +40,7 @@ public class CameraOrbit : MonoBehaviour
 
     private void Update()
     {
+        // Recenter: snap the rig's x/z onto the board centre, keeping its height.
         if (Input.GetKeyDown(recenterKey))
         {
             Vector3 pos = transform.position;
@@ -52,6 +59,7 @@ public class CameraOrbit : MonoBehaviour
             return;
         }
 
+        // Right-drag orbits the rig itself; the child camera follows along.
         if (rightHeld)
         {
             float mouseX = Input.GetAxis("Mouse X");
@@ -64,6 +72,7 @@ public class CameraOrbit : MonoBehaviour
         }
     }
 
+    // Zoom slides the child camera along its forward vector, clamped between min/max distance.
     private void Zoom()
     {
         if (childCamera == null) return;
@@ -80,6 +89,8 @@ public class CameraOrbit : MonoBehaviour
         cameraTransform.position = transform.position - cameraTransform.forward * target;
     }
 
+    // Pan moves the rig along camera-grounded axes; speed scales with zoom
+    // distance so panning feels consistent whether zoomed in or out.
     private void Pan()
     {
         if (childCamera == null) return;

@@ -1,3 +1,5 @@
+// GridContextMenu - generic right-click context menu (used by InfoTab row/column
+// headers): label/action entries near the cursor; any click outside closes it.
 using System;
 using UnityEngine;
 using UnityEngine.UI;
@@ -5,8 +7,10 @@ using TMPro;
 
 public static class GridContextMenu
 {
+    // Current menu instance (only one at a time).
     private static GameObject menuRoot;
 
+    // Build the menu at the screen position, clamped to stay on-canvas.
     public static void Show(Vector2 screenPosition, (string Label, Action Action)[] entries)
     {
         Close();
@@ -91,6 +95,7 @@ public static class GridContextMenu
         }
     }
 
+    // One menu button: closes the menu, then runs the action.
     private static void CreateEntry(Transform parent, string label, Action action)
     {
         GameObject button = new GameObject("Entry_" + label, typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));

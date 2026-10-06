@@ -1,3 +1,5 @@
+// TilePaletteController - collapse lerp for the tile palette panel (height eases
+// between CollapsedHeight and the starting height; button label swaps Show/Hide).
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;

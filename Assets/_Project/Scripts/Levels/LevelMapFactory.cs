@@ -1,3 +1,6 @@
+// Builds the Level_Select map entirely in code: a horizontally scrolling
+// dotted path of numbered level nodes with completion/lock state.
+// Auto-spawns on scene load; no prefabs involved.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -6,7 +9,9 @@ using TMPro;
 
 public static class LevelMapFactory
 {
+    // Node square size in canvas pixels.
     private const float NodeSize = 130f;
+    // Padding beyond the first/last node inside the scrollable content.
     private const float EdgePadding = 220f;
 
     // Fixed, theme-independent visuals for elements that live directly on the
@@ -19,10 +24,13 @@ public static class LevelMapFactory
     private static readonly Color DotUnlocked = new Color(0.43f, 0.46f, 0.52f);
     private static readonly Color DotLocked = new Color(0.43f, 0.46f, 0.52f, 0.40f);
 
+    // Connector dot visuals.
     private const float DotSize = 6f;
     private const float DotSpacing = 20f;
+    // Gap kept at each connector end so dots don't slide under the nodes.
     private const float ConnectorTrim = 80f;
 
+    // Rebuild the map every time Level_Select loads.
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoSpawn()
     {
@@ -30,6 +38,7 @@ public static class LevelMapFactory
         TrySpawn();
     }
 
+    // Only in Level_Select; destroy any previous map so state is rebuilt fresh.
     private static void TrySpawn()
     {
         if (SceneManager.GetActiveScene().name != "Level_Select") return;
@@ -46,6 +55,7 @@ public static class LevelMapFactory
         Build(canvas);
     }
 
+    // Create the full-screen map root; show a hint label when no levels exist.
     public static void Build(Canvas canvas)
     {
         EnsureSkyboxRotation();
@@ -72,6 +82,7 @@ public static class LevelMapFactory
         BuildPath(map.transform, levels);
     }
 
+    // Give the main camera its slowly rotating skybox, if missing.
     private static void EnsureSkyboxRotation()
     {
         Camera camera = Camera.main;
@@ -82,6 +93,7 @@ public static class LevelMapFactory
         }
     }
 
+    // Use each level's authored map position, else the zig-zag default.
     private static Vector2[] GetPositions(List<PuzzleData> levels)
     {
         Vector2[] positions = new Vector2[levels.Count];
@@ -94,6 +106,7 @@ public static class LevelMapFactory
         return positions;
     }
 
+    // Assemble the ScrollRect with content sized to the path, then connectors and nodes.
     private static void BuildPath(Transform parent, List<PuzzleData> levels)
     {
         GameObject scroll = new GameObject("PathScroll", typeof(RectTransform));
@@ -117,6 +130,7 @@ public static class LevelMapFactory
             maxX = Mathf.Max(maxX, position.x);
         }
 
+        // Content width spans the path's X range plus edge padding on both sides.
         GameObject content = new GameObject("Content", typeof(RectTransform));
         content.transform.SetParent(viewport.transform, false);
         RectTransform contentRT = content.GetComponent<RectTransform>();
@@ -126,6 +140,7 @@ public static class LevelMapFactory
         contentRT.sizeDelta = new Vector2(maxX - minX + EdgePadding * 2f, 0f);
         contentRT.anchoredPosition = Vector2.zero;
 
+        // Invisible image that still catches raycasts, so drags scroll anywhere.
         GameObject background = new GameObject("Background", typeof(RectTransform), typeof(Image));
         background.transform.SetParent(content.transform, false);
         Image backgroundImage = background.GetComponent<Image>();
@@ -139,10 +154,13 @@ public static class LevelMapFactory
         scrollRect.vertical = false;
         scrollRect.movementType = ScrollRect.MovementType.Elastic;
         scrollRect.scrollSensitivity = 40f;
+        // Scrolling shifts anchors; drop the tooltip immediately.
         scrollRect.onValueChanged.AddListener(_ => LevelTooltip.Hide());
 
+        // The level progress considers "current"; its node gets highlighted.
         int current = LevelProgress.CurrentIndex();
 
+        // Shift X so the leftmost node lands at EdgePadding inside the content.
         Vector2[] local = new Vector2[levels.Count];
         for (int i = 0; i < levels.Count; i++)
         {
@@ -162,6 +180,7 @@ public static class LevelMapFactory
         }
     }
 
+    // Lay dots along the segment between two nodes; dimmed if it leads to a locked node.
     private static void BuildDottedConnector(Transform parent, Vector2 from, Vector2 to, bool leadsToUnlocked)
     {
         Vector2 delta = to - from;
@@ -191,6 +210,8 @@ public static class LevelMapFactory
         }
     }
 
+    // Create one node: glass face, ring, number, check and "locked" labels,
+    // then wire click/state handling into LevelNode.
     private static void BuildNode(Transform parent, PuzzleData data, int index, bool unlocked, bool isCurrent, Vector2 position)
     {
         GameObject node = new GameObject($"LevelNode_{index + 1}", typeof(RectTransform), typeof(CanvasGroup));
@@ -252,6 +273,7 @@ public static class LevelMapFactory
         button.transition = Button.Transition.ColorTint;
         HexlinkTheme.ApplyHoverTint(button);
 
+        // LevelNode applies state visuals (ring colour, alpha, check/lock).
         LevelNode levelNode = node.AddComponent<LevelNode>();
         levelNode.Setup(data, index, unlocked, isCurrent, ring,
             numberTMP,
@@ -260,6 +282,7 @@ public static class LevelMapFactory
         button.onClick.AddListener(levelNode.OnNodeClicked);
     }
 
+    // TMP label helper; font size follows GameOptions.UiScale.
     private static GameObject CreateTMP(string name, Transform parent, string text, int fontSize, FontStyles style)
     {
         GameObject go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -274,6 +297,7 @@ public static class LevelMapFactory
         return go;
     }
 
+    // Stretch a rect to fill its parent.
     private static void Stretch(RectTransform rt)
     {
         rt.anchorMin = Vector2.zero;

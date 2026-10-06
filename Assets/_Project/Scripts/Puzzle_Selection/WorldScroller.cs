@@ -1,3 +1,5 @@
+// Unused template from an earlier world-navigation pass; WorldSelectUI holds
+// the working navigation. Kept as an empty stub.
 using UnityEngine;
 
 public class WorldScroller : MonoBehaviour

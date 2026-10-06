@@ -1,8 +1,12 @@
 using UnityEngine;
 
+// Data model for a tile's content (number, operation, or final target).
+// Plain [Serializable] classes, NOT ScriptableObjects — instances are created at
+// runtime by TileDataFactory and stored in BoardState.
 [System.Serializable]
 public abstract class TileData
 {
+    // The string shown on the tile's 3D label.
     public abstract string GetDisplayValue();
 }
 
@@ -20,6 +24,7 @@ public class NumberTileData : TileData
 [System.Serializable]
 public class OperationTileData : TileData
 {
+    // Factorial and SquareRoot are unary; the rest are binary.
     public enum OperationType { Add, Subtract, Multiply, Divide, Power, Factorial, SquareRoot }
     public OperationType operation;
 
@@ -39,6 +44,8 @@ public class OperationTileData : TileData
     }
 }
 
+// The "_" target tile: displays an underscore; targetNumber is the value the
+// player must reach on this hex.
 [System.Serializable]
 public class FinalTileData : TileData
 {
@@ -50,8 +57,10 @@ public class FinalTileData : TileData
     }
 }
 
+// Maps a palette symbol string (e.g. "5", "+", "_") to a TileData instance.
 public static class TileDataFactory
 {
+    // Returns null (with a warning) for unrecognized symbols.
     public static TileData CreateFromSymbol(string symbol)
     {
         // Numbers 0-9  

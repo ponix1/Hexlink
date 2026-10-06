@@ -1,3 +1,5 @@
+// Runs the authored program. Each column is a time step: first we work out what the
+// instructions actually do, then we animate them all at once before the next column.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -5,8 +7,14 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 
+// Keeps the circle occupancy map and the play/pause/step/speed controls. The design
+// choice that matters here: all the logic happens up front in the commit step and the
+// coroutines are purely cosmetic. Pausing or speeding things up mid-animation can never
+// get the real state out of sync with what's on screen.
 public class ExecutionEngine : MonoBehaviour
 {
+    // Everything below is wired up by InfoTabBuilder when it builds the tab —
+    // none of it is hooked by hand in the Inspector.
     [SerializeField] private GridController gridController;
     [SerializeField] private HexTileLabelController labelController;
     [SerializeField] private HexGridSpawner hexGridSpawner;
@@ -18,32 +26,45 @@ public class ExecutionEngine : MonoBehaviour
     [SerializeField] private TextMeshProUGUI speedLabel;
     [SerializeField] private TileInventoryUI inventoryUI;
     [SerializeField] private InstructionAuthoringController authoringController;
+    // The disc prefab circles are made from, and the tile label prefab used for
+    // their numbers.
     [SerializeField] private GameObject nodePrefab;
     [SerializeField] private GameObject tileLabelPrefab;
+    // How high circles float above the board.
     [SerializeField] private float nodeHeightY = 0.59f;
+    // Base animation lengths; the speed slider divides into these.
     [SerializeField] private float moveDuration = 0.5f;
     [SerializeField] private float spawnDuration = 0.25f;
     [SerializeField] private float mergePulseDuration = 0.3f;
+    // Tint for the column header while its column is running.
     [SerializeField] private Color activeColumnColor = new Color(0.580f, 0.740f, 0.780f);
 
+    // What hexes have circles on them — one circle per hex, max. Updated during
+    // commit; the visuals catch up on their own.
     private Dictionary<HexCoord, NumberCircle> circles = new Dictionary<HexCoord, NumberCircle>();
     private bool running;
     private bool paused;
+    // Set by Step() to let exactly one column through the pause gate.
     private bool stepQueued;
     private bool won;
+    // Which circle won, kept around so WinSequence can pulse it after the
+    // column's animations finish.
     private NumberCircle winningCircle;
     private float speedMultiplier = 1f;
 
-    // Tutorial hooks so the Level 1 tutorial can follow execution.
+    // The tutorial listens to these so it can follow execution.
     public static event System.Action ExecutionStarted;
     public static event System.Action ExecutionFinished;
     public static event System.Action PuzzleWon;
 
+    // Animations get faster with the multiplier; ReducedMotion skips them almost entirely.
     private float MoveDuration => GameOptions.ReducedMotion ? 0.01f : moveDuration / speedMultiplier;
     private float SpawnDuration => GameOptions.ReducedMotion ? 0.01f : spawnDuration / speedMultiplier;
     private float MergePulseDuration => GameOptions.ReducedMotion ? 0.01f : mergePulseDuration / speedMultiplier;
     private float labelWorldScale = 1f;
 
+    // Hook up buttons, pull in the saved speed, and listen for palette/cell/board
+    // edits so anything changing mid-run resets the sim.
     private void Start()
     {
         if (playButton != null) playButton.onClick.AddListener(OnPlayClicked);
@@ -66,6 +87,7 @@ public class ExecutionEngine : MonoBehaviour
         if (labelController != null) labelController.boardState.OnCellChanged += AutoReset;
     }
 
+    // The play button doubles as the stop button while a run is going.
     private void OnPlayClicked()
     {
         if (TutorialGate.Active && !TutorialGate.PlayAllowed()) return;
@@ -104,6 +126,8 @@ public class ExecutionEngine : MonoBehaviour
         Step();
     }
 
+    // Throw away any half-written instruction before running, so a fresh run
+    // always matches exactly what's on the grid.
     private void CancelPendingAuthoring()
     {
         if (authoringController != null)
@@ -112,6 +136,8 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // uGUI keeps a button "selected" after you click it, which leaves it stuck
+    // in the darker tint — so we clear the selection after every click.
     private void Deselect()
     {
         if (EventSystem.current != null)
@@ -127,6 +153,7 @@ public class ExecutionEngine : MonoBehaviour
         if (label != null) label.text = running ? "Stop" : "Play";
     }
 
+    // Slider callback — save straight away so the speed sticks between sessions.
     private void SetSpeedMultiplier(float value)
     {
         speedMultiplier = Mathf.Clamp(value, 0.25f, 3f);
@@ -140,6 +167,7 @@ public class ExecutionEngine : MonoBehaviour
         if (speedLabel != null) speedLabel.text = speedMultiplier.ToString("F1") + "x";
     }
 
+    // Fresh start, resume from pause, or restart if already playing.
     public void Play()
     {
         if (running && !paused)
@@ -171,6 +199,7 @@ public class ExecutionEngine : MonoBehaviour
         ExecutionStarted?.Invoke();
     }
 
+    // Full stop: kill everything, sweep the circles off the board, clear any tinting.
     public void ResetExecution()
     {
         StopAllCoroutines();
@@ -190,12 +219,15 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // Flips the flag the run loop checks between columns. No coroutine
+    // stopping — that's the point of doing logic up front.
     public void TogglePause()
     {
         paused = !paused;
         UpdatePauseLabel();
     }
 
+    // One column per press. The first press kicks the run off already paused.
     public void Step()
     {
         if (!running)
@@ -217,11 +249,13 @@ public class ExecutionEngine : MonoBehaviour
         UpdatePauseLabel();
     }
 
+    // Event adapter — OnCellChanged passes a coord we don't care about.
     private void AutoReset(HexCoord coord)
     {
         AutoReset();
     }
 
+    // The board changed under us, so quietly throw the run away (no finish events).
     private void AutoReset()
     {
         if (running || circles.Count > 0 || paused)
@@ -239,9 +273,9 @@ public class ExecutionEngine : MonoBehaviour
 
     private void ClearCircles()
     {
-        // Sweeps every NumberCircle in the scene - mid-merge operand circles are already
-        // removed from the occupancy dict before their animations destroy them, so the
-        // dictionary alone misses them and they would linger on screen after a reset.
+        // Has to sweep the whole scene rather than just the dict — operand circles get
+        // removed from the dict at commit but only destroyed by their animation, so
+        // resetting in that window would leave them stuck on screen.
         foreach (NumberCircle circle in FindObjectsByType<NumberCircle>())
         {
             Destroy(circle.gameObject);
@@ -249,6 +283,8 @@ public class ExecutionEngine : MonoBehaviour
         circles.Clear();
     }
 
+    // The main loop. One column at a time: work out the logic, animate it, repeat.
+    // Bails out early on a win.
     private IEnumerator RunProgram()
     {
         running = true;
@@ -256,13 +292,15 @@ public class ExecutionEngine : MonoBehaviour
         winningCircle = null;
         InitGeometry();
 
+            // Columns run left to right; everything within a column happens at the
+            // same time.
         for (int column = 0; column < gridController.ColumnCount; column++)
         {
             List<GridController.CellInstruction> instructions = gridController.GetColumnInstructions(column);
             if (instructions.Count == 0) continue;
 
-            // Highlight the column that is ABOUT to run before waiting on the step
-            // gate, so a paused player always sees which step they're on.
+            // Light the column up before the pause gate, so someone stepping through
+            // can always see where they are.
             gridController.SetActiveColumn(column);
 
             while (paused && !stepQueued)
@@ -271,10 +309,10 @@ public class ExecutionEngine : MonoBehaviour
             }
             stepQueued = false;
 
-            // Commit phase: instructions may depend on each other (a move vacating the tile
-            // an operation needs, a select creating a circle another instruction uses).
-            // Retry blocked instructions until a fixpoint; errors are only final once no
-            // further commits are possible.
+            // Instructions can depend on each other — a move vacating the tile an
+            // operation wants, a select making a circle something else needs. So we
+            // keep retrying the blocked ones until a full pass commits nothing new,
+            // and only then do failures count as real.
             List<Attempt> attempts = new List<Attempt>();
             foreach (GridController.CellInstruction ci in instructions)
             {
@@ -302,14 +340,17 @@ public class ExecutionEngine : MonoBehaviour
                     }
                 }
 
+                // Nothing moved this pass, so nothing more is going to unblock.
                 if (!progress) break;
             }
 
+            // Leftover moves might be a swap or a chain — try to resolve them as a group.
             if (remaining > 0 && TryCommitMoveCycle(attempts))
             {
                 remaining = 0;
             }
 
+            // Still stuck, so these are genuine failures.
             foreach (Attempt attempt in attempts)
             {
                 if (!attempt.Committed) Fail(attempt.CI, attempt.Error);
@@ -321,14 +362,14 @@ public class ExecutionEngine : MonoBehaviour
                 if (attempt.Committed && attempt.Animation != null) routines.Add(attempt.Animation);
             }
 
+            // Everything in the column animates at once; we wait for the last one.
             if (routines.Count > 0)
             {
                 yield return All(routines);
             }
 
-            // Keep the highlight on the column that just ran - the next step switches
-            // it, and ResetExecution clears it. Clearing here would leave a paused
-            // player with no indication of where the program is.
+            // Deliberately leaving the highlight on until the next column (or a reset).
+            // Clearing it here would leave a paused player with no idea where they are.
 
             if (won)
             {
@@ -348,6 +389,7 @@ public class ExecutionEngine : MonoBehaviour
         ExecutionFinished?.Invoke();
     }
 
+    // Log the win, record the scores, pulse the circle, show the popup.
     private IEnumerator WinSequence()
     {
         if (winningCircle != null)
@@ -357,6 +399,7 @@ public class ExecutionEngine : MonoBehaviour
             string puzzleId = PuzzleSelection.SelectedPuzzle?.puzzleID;
             if (!string.IsNullOrEmpty(puzzleId))
             {
+                // Completion flag for the selector screen.
                 PuzzleProgress.MarkComplete(puzzleId);
             }
 
@@ -364,6 +407,8 @@ public class ExecutionEngine : MonoBehaviour
             bool recorded = false;
             if (!string.IsNullOrEmpty(puzzleId) && gridController != null)
             {
+                // Best-attempt bookkeeping, plus flag the current solution
+                // entry as solved if one is active.
                 gridController.GetMetrics(out int instructions, out int cycles, out int processors);
                 result = PuzzleRecords.Submit(puzzleId, instructions, cycles, processors);
                 recorded = true;
@@ -379,11 +424,14 @@ public class ExecutionEngine : MonoBehaviour
 
             if (recorded)
             {
+                // Only pop the results screen if we had a puzzle to score against.
                 WinPopup.Show(result);
             }
         }
     }
 
+    // Bookkeeping for one instruction during commit. The animation is held back so
+    // the whole column can animate together as a batch.
     private class Attempt
     {
         public GridController.CellInstruction CI;
@@ -392,6 +440,7 @@ public class ExecutionEngine : MonoBehaviour
         public bool Committed;
     }
 
+    // Just routes to the right commit method based on the instruction type.
     private bool TryCommit(GridController.CellInstruction ci, out IEnumerator animation, out string error)
     {
         animation = null;
@@ -402,6 +451,7 @@ public class ExecutionEngine : MonoBehaviour
         return false;
     }
 
+    // Spawn from a number tile — as many as you like, just one per hex.
     private bool TryCommitSelect(GridController.CellInstruction ci, SelectInstructionData select, out IEnumerator animation, out string error)
     {
         animation = null;
@@ -429,6 +479,7 @@ public class ExecutionEngine : MonoBehaviour
         return true;
     }
 
+    // Move to a free tile. Occupancy changes now, the tween happens later.
     private bool TryCommitMove(GridController.CellInstruction ci, MoveInstructionData move, out IEnumerator animation, out string error)
     {
         animation = null;
@@ -457,12 +508,14 @@ public class ExecutionEngine : MonoBehaviour
         return true;
     }
 
+    // Check for the win once the circle has visually arrived.
     private IEnumerator MoveAndCheckWin(NumberCircle circle, HexCoord destination)
     {
         yield return circle.MoveTo(Anchor(destination), MoveDuration);
         CheckWin(destination, circle);
     }
 
+    // Fold the operands into the subject. The result ends up on the op tile.
     private bool TryCommitOperation(GridController.CellInstruction ci, OperationInstructionData op, out IEnumerator animation, out string error)
     {
         animation = null;
@@ -502,6 +555,7 @@ public class ExecutionEngine : MonoBehaviour
         }
         else
         {
+            // Apply operands in the order they were clicked. Dividing by zero is an error.
             foreach (NumberCircle operandCircle in operandCircles)
             {
                 if (opData.operation == OperationTileData.OperationType.Divide && operandCircle.Value == 0)
@@ -513,6 +567,8 @@ public class ExecutionEngine : MonoBehaviour
             }
         }
 
+        // Occupancy is gone now, but the operand objects stick around until the merge
+        // animation destroys them — that gap is why ClearCircles sweeps the scene.
         circles.Remove(op.Source);
         foreach (NumberCircle operandCircle in operandCircles)
         {
@@ -526,8 +582,8 @@ public class ExecutionEngine : MonoBehaviour
         return true;
     }
 
-    // Resolves move cycles/chains (swaps, rotations) that single-pass commits can't:
-    // every destination must be empty or vacated by another move in the same group.
+    // Handles swaps and rotations, which normal commits can't do. The whole group
+    // moves at once, so a destination only needs to be free by the end of the group.
     private bool TryCommitMoveCycle(List<Attempt> attempts)
     {
         List<Attempt> pending = new List<Attempt>();
@@ -544,6 +600,8 @@ public class ExecutionEngine : MonoBehaviour
             moves.Add(move);
         }
 
+        // Check the whole group up front — unique sources and destinations, and
+        // anything sitting on a destination has to be moving away in this group.
         HashSet<HexCoord> sources = new HashSet<HexCoord>();
         HashSet<HexCoord> destinations = new HashSet<HexCoord>();
         foreach (MoveInstructionData move in moves)
@@ -558,6 +616,8 @@ public class ExecutionEngine : MonoBehaviour
             if (circles.ContainsKey(move.Destination) && !sources.Contains(move.Destination)) return false;
         }
 
+        // Grab all the movers first, then drop every source before placing anything,
+        // otherwise a swap would trip over its own occupancy.
         List<NumberCircle> movingCircles = new List<NumberCircle>();
         foreach (MoveInstructionData move in moves)
         {
@@ -582,6 +642,8 @@ public class ExecutionEngine : MonoBehaviour
         return true;
     }
 
+    // Everyone slides onto the op tile together, the operands vanish, and the subject
+    // takes on the result.
     private IEnumerator MergeCircles(NumberCircle subject, List<NumberCircle> operandCircles, int result)
     {
         Vector3 target = Anchor(subject.Coord);
@@ -602,6 +664,8 @@ public class ExecutionEngine : MonoBehaviour
         yield return subject.MergePulse(MergePulseDuration);
     }
 
+    // Plain int math on purpose. Divide truncates (4/3 = 1), which is what
+    // the puzzles expect.
     private int Apply(OperationTileData.OperationType operation, int a, int b)
     {
         switch (operation)
@@ -615,6 +679,8 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // Sqrt rounds to the nearest whole number, factorial is the usual running
+    // product.
     private int ApplyUnary(OperationTileData.OperationType operation, int a)
     {
         if (operation == OperationTileData.OperationType.SquareRoot) return Mathf.RoundToInt(Mathf.Sqrt(a));
@@ -624,6 +690,7 @@ public class ExecutionEngine : MonoBehaviour
         return result;
     }
 
+    // Winning means landing on a final tile with the matching target number.
     private void CheckWin(HexCoord coord, NumberCircle circle)
     {
         if (won) return;
@@ -634,12 +701,15 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // Turn the failing cell red and say why in the console.
     private void Fail(GridController.CellInstruction ci, string message)
     {
         gridController.FlagError(ci.Processor, ci.Column);
         Debug.LogWarning($"[P{ci.Processor + 1}, col {ci.Column + 1}] {message}");
     }
 
+    // Build a circle from the Node prefab. Colliders come off so raycasts aimed at
+    // the board underneath still work.
     private NumberCircle CreateCircle(HexCoord coord)
     {
         GameObject go = Instantiate(nodePrefab);
@@ -655,6 +725,7 @@ public class ExecutionEngine : MonoBehaviour
         return circle;
     }
 
+    // Grab a tile's scale once so circle labels match the board size.
     private void InitGeometry()
     {
         IReadOnlyDictionary<HexCoord, GameObject> tiles = hexGridSpawner.SpawnedTiles;
@@ -667,12 +738,15 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // Where a circle sits over a given hex — fixed height above the board.
     private Vector3 Anchor(HexCoord coord)
     {
         Vector3 tilePos = hexGridSpawner.SpawnedTiles[coord].transform.position;
         return new Vector3(tilePos.x, nodeHeightY, tilePos.z);
     }
 
+    // Poor man's "wait for all" — Unity has no built-in way to join coroutines, so
+    // we count down as each one finishes and yield until the count hits zero.
     private IEnumerator All(List<IEnumerator> routines)
     {
         int remaining = routines.Count;
@@ -686,6 +760,7 @@ public class ExecutionEngine : MonoBehaviour
         }
     }
 
+    // Runs a routine, then flags it done.
     private IEnumerator Wrap(IEnumerator routine, System.Action done)
     {
         yield return routine;
