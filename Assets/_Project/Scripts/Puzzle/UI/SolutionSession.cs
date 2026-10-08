@@ -8,7 +8,8 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
-// Boots the session plus a "Solutions" button onto the canvas of every scene.
+// Boots the session, a "Solutions" button (top-right) and the "TARGET: <n>"
+// readout (top-centre) onto the canvas of every scene.
 public static class SolutionSessionSpawner
 {
     // Install the spawn hook for every scene load (and run it once now).
@@ -46,10 +47,11 @@ public static class SolutionSessionSpawner
         buttonComponent.onClick.AddListener(session.OpenPopup);
 
         RectTransform rt = button.GetComponent<RectTransform>();
-        rt.anchorMin = new Vector2(0.5f, 1f);
-        rt.anchorMax = new Vector2(0.5f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = new Vector2(0f, -8f);
+        rt.anchorMin = new Vector2(1f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(1f, 1f);
+        // Sits flush left of the Back button (110 wide at -10,-10).
+        rt.anchoredPosition = new Vector2(-130f, -10f);
         rt.sizeDelta = new Vector2(160f, 34f);
 
         GameObject label = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
@@ -67,6 +69,42 @@ public static class SolutionSessionSpawner
         labelRT.offsetMax = Vector2.zero;
 
         ThemeSwitcher.ApplyToSubtree(button.transform);
+
+        SpawnTargetLabel(canvas);
+    }
+
+    // "TARGET: <number>" readout pinned to the top-centre of the screen so the
+    // player always sees the score they need to reach.
+    private static void SpawnTargetLabel(Canvas canvas)
+    {
+        GameObject targetGO = new GameObject("TargetLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
+        targetGO.transform.SetParent(canvas.transform, false);
+
+        TextMeshProUGUI targetText = targetGO.GetComponent<TextMeshProUGUI>();
+        PuzzleData puzzle = PuzzleSelection.SelectedPuzzle;
+        if (puzzle == null)
+        {
+            targetGO.SetActive(false);
+            return;
+        }
+
+        targetText.text = $"<color=#{ColorUtility.ToHtmlStringRGB(HexlinkTheme.TextGray)}>TARGET:</color> " +
+                          $"<color=#{ColorUtility.ToHtmlStringRGB(HexlinkTheme.Accent)}>{puzzle.GetDisplayTarget()}</color>";
+        targetText.fontSize = Mathf.Max(8f, Mathf.Round(16f * GameOptions.UiScale));
+        targetText.fontStyle = FontStyles.Bold;
+        targetText.color = HexlinkTheme.TextLight;
+        targetText.alignment = TextAlignmentOptions.Center;
+        targetText.raycastTarget = false;
+        targetText.textWrappingMode = TextWrappingModes.NoWrap;
+
+        RectTransform targetRT = targetGO.GetComponent<RectTransform>();
+        targetRT.anchorMin = new Vector2(0.5f, 1f);
+        targetRT.anchorMax = new Vector2(0.5f, 1f);
+        targetRT.pivot = new Vector2(0.5f, 1f);
+        targetRT.anchoredPosition = new Vector2(0f, -10f);
+        targetRT.sizeDelta = new Vector2(300f, 30f);
+
+        ThemeSwitcher.ApplyToSubtree(targetGO.transform);
     }
 }
 

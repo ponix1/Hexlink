@@ -21,6 +21,9 @@ public static class SolutionPickerPopup
     private static string GrayHex => HexlinkTheme.TextGrayHex;
     private static string LightHex => HexlinkTheme.TextLightHex;
 
+    // Fired when the player clicks New; the tutorial listens for it.
+    public static event System.Action NewRequested;
+
     // Context and callbacks captured from SolutionSession while the popup is open.
     private static PuzzleData puzzle;
     private static System.Action<int> onOpen;
@@ -438,6 +441,7 @@ public static class SolutionPickerPopup
     // Close first, then let the session start a fresh unsaved solution.
     private static void NewClicked()
     {
+        NewRequested?.Invoke();
         System.Action handler = onNew;
         Close();
         handler?.Invoke();

@@ -1,13 +1,18 @@
-// Gameplay scripts call the *Allowed checks; TutorialRunner flips the flags per step.
-// Lock state for the Level 1 tutorial. While Active, the gated systems only
-// allow what the current step permits: one palette tile at a time, tile
-// placement vs authoring, the instruction hotkeys, and Play.
+// Gameplay scripts call the *Allowed checks; TutorialRunner flips the flags per page
+// (and per task, via the first-incomplete index). Lock state for the Level 1
+// tutorial. While Active, the gated systems only allow what the current page
+// permits: a set of palette tiles, tile placement vs authoring, the instruction
+// hotkeys, the processor key, and Play.
+using System.Collections.Generic;
+
 public static class TutorialGate
 {
     // Master switch: false (default) means everything is allowed.
     public static bool Active;
 
-    public static string AllowedTile;        // normalized symbol; null = none
+    // Normalized symbols allowed in the palette; empty = none.
+    public static HashSet<string> AllowedTiles { get; } = new HashSet<string>();
+
     public static bool AllowPlacement;
     public static bool AllowAuthoring;
     public static bool AllowRemoval;
@@ -20,7 +25,7 @@ public static class TutorialGate
 
     public static bool TileAllowed(string symbol)
     {
-        return !Active || symbol == AllowedTile;
+        return !Active || AllowedTiles.Contains(symbol);
     }
 
     public static bool PlacementAllowed()
@@ -47,7 +52,7 @@ public static class TutorialGate
     public static void UnlockAll()
     {
         Active = false;
-        AllowedTile = null;
+        AllowedTiles.Clear();
         AllowPlacement = true;
         AllowAuthoring = true;
         AllowRemoval = true;

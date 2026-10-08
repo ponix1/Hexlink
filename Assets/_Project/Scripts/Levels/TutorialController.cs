@@ -1,7 +1,11 @@
 // Level 1 interactive tutorial. TutorialLauncher auto-spawns TutorialRunner in
-// Puzzle_Play for puzzle "L-1" (until completed once); TutorialRunner walks the
-// player through tiles, the instruction keys (SPACE/Z/C/D) and Play using step
-// popups, input gating via TutorialGate, and board-state validation.
+// Puzzle_Play for puzzle "L-1" (until completed once). The runner docks a panel
+// flush against the right edge of the screen: a TUTORIAL header, short
+// explanation text, then the page's TASKS - each row flips green the moment
+// the player does it, and the thing a task refers to gets a thick pulsing
+// accent ring. Info pages additionally dim the whole screen except the panel
+// and the highlighted element (spotlight). A dimmed Next button unlocks once
+// every task is green. Input stays gated via TutorialGate, re-locked per task.
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -41,38 +45,68 @@ public static class TutorialLauncher
         PuzzleData puzzle = PuzzleSelection.SelectedPuzzle;
         bool complete = TutorialCompleted();
         bool exists = Object.FindAnyObjectByType<TutorialRunner>() != null;
-        Debug.Log($"TutorialLauncher: scene=Puzzle_Play puzzle={(puzzle != null ? puzzle.puzzleID : "null")} tutorialDone={complete} runnerExists={exists}");
 
         if (puzzle == null || puzzle.puzzleID != "L-1") return;
         if (complete) return;
         if (exists) return;
 
         new GameObject("LevelTutorial").AddComponent<TutorialRunner>();
-        Debug.Log("TutorialLauncher: tutorial spawned.");
     }
 }
 
 public class TutorialRunner : MonoBehaviour
 {
-    // Fixed blue outline so tutorial popups are instantly recognisable.
+    // Fixed blue outline so the tutorial panel is instantly recognisable.
     private static readonly Color OutlineBlue = new Color(0.204f, 0.765f, 1f, 0.95f);
+    // Task-complete green (same shade the solutions window uses for solved).
+    private static readonly Color TaskGreen = new Color(0.30f, 0.78f, 0.47f);
+    // Spotlight scrim for info pages; clicks pass through untouched.
+    private static readonly Color DimColor = new Color(0f, 0f, 0f, 0.55f);
 
-    // One tutorial popup. ContinueButton steps advance on click; otherwise
-    // Done() is polled in Update until it returns true.
-    private class Step
+    // Panel geometry, in canvas units measured from the top of the panel.
+    private const float PanelWidth = 460f;
+    private const float HeaderTop = 14f;
+    private const float HeaderHeight = 36f;
+    private const float BodyTop = HeaderTop + HeaderHeight + 10f;
+    private const float BodyHeight = 150f;
+    private const float DividerY = BodyTop + BodyHeight + 12f;
+    private const float TasksHeaderY = DividerY + 12f;
+    private const float RowsY = TasksHeaderY + 20f + 8f;
+    private const float RowStep = 30f;
+    private const float FooterHeight = 64f;
+    private const float InfoHeight = BodyTop + BodyHeight + 20f + FooterHeight;
+    // Spotlight hole padding around the highlighted element.
+    private const float HolePadding = 12f;
+
+    // One task row: what to do, what to highlight while it's open, and the
+    // completion predicate polled in Update.
+    private class TaskItem
     {
-        // Popup body text.
-        public string Text;
-        // Optional italic hint line.
-        public string Hint;
-        // Anchor name: "BOARD", "GridPanel", "TilePalette" or "PlayButton".
+        public string Label;
+        // Transform name to ring while this task is the first open one.
         public string Anchor;
-        // True = show a Continue button; false = wait for Done.
-        public bool ContinueButton;
-        // Applies this step's TutorialGate locks.
-        public System.Action Locks;
         // Completion predicate polled in Update.
         public System.Func<bool> Done;
+    }
+
+    // One tutorial page. Info pages explain (with the screen dimmed to a
+    // spotlight) and wait for Next; task pages keep the screen normal and
+    // unlock Next only when every task is green. Locks receives the index of
+    // the first incomplete task so permissions tighten/loosen per task.
+    // AutoAdvance pages move on by themselves once every task is green (used
+    // after a win so the next instruction lands before the results popup).
+    private class Step
+    {
+        public string Text;
+        // Highlighted on info pages (and as a fallback on task pages).
+        public string Anchor;
+        // True = explanation only, no tasks.
+        public bool InfoOnly;
+        // True = advance the moment every task is green (no Next click).
+        public bool AutoAdvance;
+        // Permissions for the first incomplete task index.
+        public System.Action<int> Locks;
+        public List<TaskItem> Tasks = new List<TaskItem>();
     }
 
     // Scene systems the tutorial observes, locks, and validates against.
@@ -82,26 +116,49 @@ public class TutorialRunner : MonoBehaviour
     private HexTileLabelController labelController;
     private InstructionAuthoringController authoring;
 
-    // Popup UI pieces, built in BuildPopup.
-    private GameObject popupRoot;
-    private GameObject highlight;
+    // Panel UI pieces, built once in BuildPanel.
+    private GameObject panelRoot;
+    private RectTransform panelRT;
     private TextMeshProUGUI bodyText;
-    private TextMeshProUGUI hintText;
-    private TextMeshProUGUI waitingText;
-    private Button continueButton;
-    private ArrowImage arrow;
+    private GameObject tasksHeader;
+    private GameObject divider;
+    private RectTransform taskRows;
+    private Button nextButton;
+    private CanvasGroup nextGroup;
+    private GameObject highlight;
 
-    // The scripted steps and the one currently shown (-1 = not started).
+    // Spotlight dim: four band images framing a hole around the highlight.
+    private GameObject dimRoot;
+    private readonly Image[] dimBands = new Image[4];
+    // What the dim hole exposes: a UI transform, or the world-space board.
+    private Transform dimHoleTarget;
+    private bool dimHoleBoard;
+    // Anchor the current ring targets; retried in Update so late-spawning
+    // targets (e.g. the results popup's Continue button) get ringed too.
+    private string currentAnchorName;
+
+    // Per-page task row labels, index-aligned with the active step's tasks.
+    private readonly List<TextMeshProUGUI> taskLabels = new List<TextMeshProUGUI>();
+    // Completion flags for the active page's tasks.
+    private bool[] taskDone = new bool[0];
+
+    // The scripted pages and the one currently shown (-1 = not started).
     private readonly List<Step> steps = new List<Step>();
     private int stepIndex = -1;
 
-    // Progress flags set by event handlers; reset per step (per run for Play steps).
+    // Progress flags set by event handlers; reset per page.
     private bool executionStarted;
     private bool executionFinished;
     private bool puzzleWon;
     private bool sawCellSelection;
     private bool boardChangedSinceStep;
-    private bool gridChangedSinceStep;
+    private bool newSolutionRequested;
+    // Latches once the results popup has been seen, so the "click Continue"
+    // task can wait for it to open and then close.
+    private bool seenWinPopup;
+    // Set the first time the player wins while the tutorial is live; winning
+    // the level always counts as completing the tutorial, even if skipped after.
+    private bool wonOnce;
 
     // Lock everything the instant the runner exists, before scene refs resolve.
     private void Awake()
@@ -110,7 +167,7 @@ public class TutorialRunner : MonoBehaviour
         LockAll();
     }
 
-    // Resolve refs (abort if missing), hook gameplay events, build steps + popup.
+    // Resolve refs (abort if missing), hook gameplay events, build steps + panel.
     private void Start()
     {
         canvas = FindAnyObjectByType<Canvas>();
@@ -121,23 +178,20 @@ public class TutorialRunner : MonoBehaviour
 
         if (canvas == null || inventoryUI == null || grid == null || labelController == null || authoring == null)
         {
-            Debug.LogError($"TutorialRunner: missing refs - canvas={canvas != null} inventory={inventoryUI != null} grid={grid != null} labels={labelController != null} authoring={authoring != null}");
             EndTutorial(false);
             return;
         }
 
-        Debug.Log("TutorialRunner: refs OK, building steps.");
-
         ExecutionEngine.ExecutionStarted += OnExecutionStarted;
         ExecutionEngine.ExecutionFinished += OnExecutionFinished;
         ExecutionEngine.PuzzleWon += OnPuzzleWon;
+        SolutionPickerPopup.NewRequested += OnNewSolutionRequested;
         grid.OnCellSelected += OnCellSelected;
-        grid.OnGridChanged += OnGridChanged;
         labelController.boardState.OnCellChanged += OnBoardChanged;
 
         BuildSteps();
-        BuildPopup();
-        inventoryUI.RefreshPaletteAvailability();
+        BuildPanel();
+        BuildDim();
         StartCoroutine(BeginNextFrame());
     }
 
@@ -147,8 +201,8 @@ public class TutorialRunner : MonoBehaviour
         yield return null;
 
         // Start from a clean slate: wipe any autosaved tiles and instructions
-        // so every step validates a fresh action rather than pre-existing
-        // state (which would instantly cascade through all steps).
+        // so every task validates a fresh action rather than pre-existing
+        // state (which would instantly cascade through all pages).
         List<HexCoord> coords = new List<HexCoord>(labelController.boardState.AllTiles.Keys);
         foreach (HexCoord coord in coords)
         {
@@ -157,19 +211,15 @@ public class TutorialRunner : MonoBehaviour
         grid.ClearGrid();
 
         yield return null;
-        boardChangedSinceStep = false;
-        gridChangedSinceStep = false;
-        sawCellSelection = false;
-
         NextStep();
     }
 
     private void OnExecutionStarted() { executionStarted = true; }
     private void OnExecutionFinished() { executionFinished = true; }
-    private void OnPuzzleWon() { puzzleWon = true; }
+    private void OnPuzzleWon() { puzzleWon = true; wonOnce = true; }
     private void OnCellSelected() { sawCellSelection = true; }
-    private void OnGridChanged() { gridChangedSinceStep = true; }
     private void OnBoardChanged(HexCoord coord) { boardChangedSinceStep = true; }
+    private void OnNewSolutionRequested() { newSolutionRequested = true; }
 
     // Unhook events; destroying the runner ends the tutorial without completing it.
     private void OnDestroy()
@@ -177,38 +227,86 @@ public class TutorialRunner : MonoBehaviour
         ExecutionEngine.ExecutionStarted -= OnExecutionStarted;
         ExecutionEngine.ExecutionFinished -= OnExecutionFinished;
         ExecutionEngine.PuzzleWon -= OnPuzzleWon;
+        SolutionPickerPopup.NewRequested -= OnNewSolutionRequested;
         if (grid != null)
         {
             grid.OnCellSelected -= OnCellSelected;
-            grid.OnGridChanged -= OnGridChanged;
         }
         if (labelController != null) labelController.boardState.OnCellChanged -= OnBoardChanged;
         EndTutorial(false);
     }
 
-    // Poll the active step's Done predicate; run the idle pulse/breathe effects.
+    // Poll the active page's tasks; pulse the ring; track the results popup;
+    // keep the spotlight hole on its target.
     private void Update()
     {
-        if (stepIndex >= 0 && stepIndex < steps.Count && steps[stepIndex].Done != null)
+        PollTasks();
+
+        if (!seenWinPopup && FindDeep(canvas.transform, "WinPopup") != null) seenWinPopup = true;
+
+        // Popups spawn as the last sibling, which would bury the tutorial
+        // panel under their backdrops - keep the panel on top instead.
+        if (panelRoot != null
+            && panelRoot.transform.GetSiblingIndex() != panelRoot.transform.parent.childCount - 1)
         {
-            if (steps[stepIndex].Done()) NextStep();
+            panelRoot.transform.SetAsLastSibling();
+        }
+
+        // The ring target may not exist yet when the page applies (popups
+        // spawn late) or may have been rebuilt - keep retrying cheaply.
+        if (highlight == null && dimHoleTarget == null && !dimHoleBoard
+            && !string.IsNullOrEmpty(currentAnchorName))
+        {
+            HighlightAnchor(currentAnchorName);
         }
 
         if (highlight != null && !GameOptions.ReducedMotion)
         {
-            float pulse = 1f + Mathf.Sin(Time.unscaledTime * 2.4f) * 0.02f;
+            float pulse = 1f + Mathf.Sin(Time.unscaledTime * 2.4f) * 0.05f;
             highlight.transform.localScale = Vector3.one * pulse;
         }
 
-        if (waitingText != null && waitingText.gameObject.activeSelf && !GameOptions.ReducedMotion)
+        if (dimRoot != null && dimRoot.activeSelf) RefreshDim();
+    }
+
+    // Flip any freshly satisfied task to green and refresh locks/Next/highlight.
+    // Tasks complete strictly in order: only the first open task is polled, so
+    // a later task whose predicate happens to hold at page start (e.g.
+    // "delete the processor you added" while it is still deleted) never
+    // short-circuits the sequence.
+    private void PollTasks()
+    {
+        if (stepIndex < 0 || stepIndex >= steps.Count) return;
+        Step step = steps[stepIndex];
+        if (step.InfoOnly) return;
+
+        for (int i = 0; i < step.Tasks.Count; i++)
         {
-            float breathe = 0.55f + Mathf.Sin(Time.unscaledTime * 2.0f) * 0.25f;
-            Color color = HexlinkTheme.TextGray;
-            waitingText.color = new Color(color.r, color.g, color.b, breathe);
+            if (taskDone[i]) continue;
+
+            if (step.Tasks[i].Done != null && step.Tasks[i].Done())
+            {
+                taskDone[i] = true;
+                RefreshTaskState();
+
+                // Win pages flip straight to the next page so the instruction
+                // ("Good job - click CONTINUE") is on screen before the
+                // results popup appears and steals focus.
+                if (step.AutoAdvance)
+                {
+                    bool allDone = true;
+                    for (int t = 0; t < taskDone.Length; t++)
+                    {
+                        if (!taskDone[t]) { allDone = false; break; }
+                    }
+                    if (allDone) NextStep();
+                }
+            }
+            return;
         }
     }
 
-    // Advance to the next step; running past the last one completes the tutorial.
+    // Advance to the next page; running past the last one completes the tutorial.
     private void NextStep()
     {
         stepIndex++;
@@ -223,36 +321,99 @@ public class TutorialRunner : MonoBehaviour
         ApplyStep(steps[stepIndex]);
     }
 
-    // Reset progress flags, apply locks, refresh and position the popup.
+    // Reset per-page state, rebuild the task rows, apply locks and sizing.
     private void ApplyStep(Step step)
     {
         sawCellSelection = false;
         boardChangedSinceStep = false;
-        gridChangedSinceStep = false;
-        step.Locks?.Invoke();
-        inventoryUI.RefreshPaletteAvailability();
+        executionStarted = false;
+        executionFinished = false;
+        puzzleWon = false;
+        newSolutionRequested = false;
+        seenWinPopup = false;
+        taskDone = new bool[step.Tasks.Count];
 
         bodyText.text = step.Text;
-        hintText.text = step.Hint ?? "";
-        hintText.gameObject.SetActive(!string.IsNullOrEmpty(step.Hint));
-        continueButton.gameObject.SetActive(step.ContinueButton);
-        waitingText.gameObject.SetActive(!step.ContinueButton);
 
-        PositionForAnchor(step.Anchor);
-        HighlightAnchor(step.Anchor);
-        ThemeSwitcher.ApplyToSubtree(popupRoot.transform);
+        bool showTasks = !step.InfoOnly;
+        divider.SetActive(showTasks);
+        tasksHeader.SetActive(showTasks);
+        dimRoot.SetActive(step.InfoOnly);
+        panelRT.sizeDelta = new Vector2(PanelWidth,
+            step.InfoOnly ? InfoHeight : RowsY + step.Tasks.Count * RowStep + FooterHeight);
+
+        RebuildTaskRows(step);
+        RefreshTaskState();
+        ThemeSwitcher.ApplyToSubtree(panelRoot.transform);
     }
 
-    // Optionally mark done, release the gate, tear down popup and runner.
-    private void EndTutorial(bool markCompleted)
+    // Destroy last page's rows and stamp one label per task.
+    private void RebuildTaskRows(Step step)
     {
-        if (markCompleted) TutorialLauncher.MarkTutorialCompleted();
-        stepIndex = -1;
-        TutorialGate.UnlockAll();
-        if (inventoryUI != null) inventoryUI.RefreshPaletteAvailability();
-        if (popupRoot != null) Destroy(popupRoot);
-        DestroyHighlight();
-        Destroy(gameObject);
+        for (int i = taskLabels.Count - 1; i >= 0; i--)
+        {
+            if (taskLabels[i] != null) Destroy(taskLabels[i].gameObject);
+        }
+        taskLabels.Clear();
+
+        if (step.InfoOnly) return;
+
+        for (int i = 0; i < step.Tasks.Count; i++)
+        {
+            GameObject row = new GameObject("TaskRow_" + (i + 1), typeof(RectTransform), typeof(TextMeshProUGUI));
+            row.transform.SetParent(taskRows, false);
+            TextMeshProUGUI tmp = row.GetComponent<TextMeshProUGUI>();
+            tmp.fontSize = Mathf.Max(8f, Mathf.Round(16f * GameOptions.UiScale));
+            tmp.alignment = TextAlignmentOptions.MidlineLeft;
+            tmp.raycastTarget = false;
+            RectTransform rowRT = row.GetComponent<RectTransform>();
+            rowRT.anchorMin = new Vector2(0f, 1f);
+            rowRT.anchorMax = new Vector2(1f, 1f);
+            rowRT.pivot = new Vector2(0f, 1f);
+            rowRT.offsetMin = new Vector2(20f, -(i + 1) * RowStep);
+            rowRT.offsetMax = new Vector2(-20f, -i * RowStep - 4f);
+            taskLabels.Add(tmp);
+        }
+    }
+
+    // Rewrite every row's marker/colour, re-lock permissions for the first
+    // open task, gate the Next button and re-aim the highlight ring.
+    private void RefreshTaskState()
+    {
+        Step step = steps[stepIndex];
+
+        int firstIncomplete = -1;
+        for (int i = 0; i < taskDone.Length; i++)
+        {
+            if (!taskDone[i]) { firstIncomplete = i; break; }
+        }
+
+        for (int i = 0; i < taskLabels.Count; i++)
+        {
+            bool done = taskDone[i];
+            TextMeshProUGUI tmp = taskLabels[i];
+            tmp.text = (done ? "\u2713" : "\u25CB") + "  " + step.Tasks[i].Label;
+            tmp.color = done ? TaskGreen : HexlinkTheme.TextLight;
+            tmp.fontStyle = done ? FontStyles.Bold : FontStyles.Normal;
+        }
+
+        ApplyLocks(step, firstIncomplete);
+        SetNextEnabled(step.InfoOnly || firstIncomplete < 0);
+        UpdateHighlight(step, firstIncomplete);
+    }
+
+    // Pages never see -1 from their own lambda; a finished page locks down.
+    private void ApplyLocks(Step step, int firstIncomplete)
+    {
+        if (firstIncomplete >= 0 && step.Locks != null)
+        {
+            step.Locks(firstIncomplete);
+        }
+        else
+        {
+            LockAll();
+        }
+        inventoryUI.RefreshPaletteAvailability();
     }
 
     // ---------------------------------------------------------------- locks
@@ -262,20 +423,24 @@ public class TutorialRunner : MonoBehaviour
         SetLocks(null, false, false, false, false, false, false, false, false);
     }
 
-    // Write one step's permissions into the shared TutorialGate.
-    private void SetLocks(string tile, bool placement, bool authoring, bool removal, bool play,
-        bool space, bool operation, bool move, bool commit)
+    // Write one task's permissions into the shared TutorialGate.
+    private void SetLocks(string[] tiles, bool placement, bool authoringAllowed, bool removal, bool play,
+        bool space, bool operation, bool move, bool commit, bool processorKey = false)
     {
-        TutorialGate.AllowedTile = tile;
+        TutorialGate.AllowedTiles.Clear();
+        if (tiles != null)
+        {
+            foreach (string tile in tiles) TutorialGate.AllowedTiles.Add(tile);
+        }
         TutorialGate.AllowPlacement = placement;
-        TutorialGate.AllowAuthoring = authoring;
+        TutorialGate.AllowAuthoring = authoringAllowed;
         TutorialGate.AllowRemoval = removal;
         TutorialGate.AllowPlay = play;
         TutorialGate.AllowSpaceKey = space;
         TutorialGate.AllowOperationKey = operation;
         TutorialGate.AllowMoveKey = move;
         TutorialGate.AllowCommitKey = commit;
-        TutorialGate.AllowProcessorKey = false;
+        TutorialGate.AllowProcessorKey = processorKey;
     }
 
     // ----------------------------------------------------------- validation
@@ -367,8 +532,7 @@ public class TutorialRunner : MonoBehaviour
         return false;
     }
 
-    // Position-independent: any cell holding the instruction type counts, so
-    // the tutorial never gets stuck because the player used a different cell.
+    // Position-independent: any cell holding the instruction type counts.
     private bool AnyCellHas<T>() where T : InstructionData
     {
         for (int p = 0; p < grid.ProcessorCount; p++)
@@ -395,234 +559,250 @@ public class TutorialRunner : MonoBehaviour
         return count;
     }
 
-    // ----------------------------------------------------------------- steps
+    // Count instructions of a type inside one time-step column.
+    private int CountInColumn<T>(int columnIndex) where T : InstructionData
+    {
+        int count = 0;
+        for (int p = 0; p < grid.ProcessorCount; p++)
+        {
+            if (grid.GetInstructionAt(p, columnIndex) is T) count++;
+        }
+        return count;
+    }
 
-    // The scripted sequence: each Step is one popup with its Locks (what input
-    // is allowed) and its Done test (what advances to the next popup).
+    // The Solutions window is a procedurally built canvas child - find by name.
+    private bool SolutionsPopupOpen()
+    {
+        return FindDeep(canvas.transform, "SolutionPickerPopup") != null;
+    }
+
+    // All four tiles the optimisation rebuild needs are on the board.
+    private bool OptimizationTilesPlaced()
+    {
+        return CountTiles(IsNumberOne) >= 2 && PlusAdjacentToBothOnes() && HasFinalTile(out _);
+    }
+
+    // ----------------------------------------------------------------- pages
+
+    // The scripted sequence: each Step is one panel page with its Locks (what
+    // input the first open task permits) and per-task Done tests.
     private void BuildSteps()
     {
-        // ---- intro: name each part
+        // ---- intro: name each part, one page each
         steps.Add(new Step
         {
-            Text = "This is the HEX GRID - your board. You place number tiles and operator tiles onto it.",
+            Text = "This is the HEX GRID. You place tiles here - your program moves numbers across it.",
             Anchor = "BOARD",
-            ContinueButton = true,
-            Locks = LockAll
+            InfoOnly = true
         });
         steps.Add(new Step
         {
-            Text = "This is the CODING INTERFACE. Each cell holds ONE instruction. Your program runs one column per step, left to right.",
+            Text = "This is the TARGET: build this number and deliver it to a finish tile. Here it's 2.",
+            Anchor = "TargetLabel",
+            InfoOnly = true
+        });
+        steps.Add(new Step
+        {
+            Text = "This is the CODING INTERFACE. One instruction per cell. It runs left to right, one column per step.",
             Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
+            InfoOnly = true
         });
         steps.Add(new Step
         {
-            Text = "This is the TILE PALETTE. Click a tile here to pick it up, then click a hex to place it.",
+            Text = "This is the TILE PALETTE. Click a tile here, then a hex to place it.",
             Anchor = "TilePalette",
-            ContinueButton = true,
-            Locks = LockAll
+            InfoOnly = true
         });
         steps.Add(new Step
         {
-            Text = "This is PLAY. It runs your program and the nodes move on the board.",
+            Text = "This is PLAY - it runs your program.",
             Anchor = "PlayButton",
-            ContinueButton = true,
-            Locks = LockAll
+            InfoOnly = true
         });
 
         // ---- place the tiles
         steps.Add(new Step
         {
-            Text = "Goal: turn 1 + 1 into 2 and deliver it to a finish tile. First, the tiles.",
+            Text = "Build 1 + 1. Middle-click a placed tile to delete it.",
             Anchor = "TilePalette",
-            ContinueButton = true,
-            Locks = LockAll
-        });
-        steps.Add(new Step
-        {
-            Text = "Place a 1. Click 1 in the palette, then click any hex.",
-            Anchor = "TilePalette",
-            Locks = () => SetLocks("1", true, false, false, false, false, false, false, false),
-            Done = () => boardChangedSinceStep && CountTiles(IsNumberOne) >= 1
-        });
-        steps.Add(new Step
-        {
-            Text = "Place the second 1 on another hex.",
-            Anchor = "TilePalette",
-            Locks = () => SetLocks("1", true, false, false, false, false, false, false, false),
-            Done = () => boardChangedSinceStep && CountTiles(IsNumberOne) >= 2
-        });
-        steps.Add(new Step
-        {
-            Text = "Place a + between them. It must touch both 1s.",
-            Hint = "Middle-click a placed tile to remove it.",
-            Anchor = "TilePalette",
-            Locks = () => SetLocks("+", true, false, true, false, false, false, false, false),
-            Done = () => boardChangedSinceStep && PlusAdjacentToBothOnes()
+            Tasks =
+            {
+                new TaskItem { Label = "Select 1 from the palette", Anchor = "Tile_1",
+                    Done = () => inventoryUI.CurrentSelectedTile == "1" },
+                new TaskItem { Label = "Place the 1 on any hex", Anchor = "BOARD",
+                    Done = () => boardChangedSinceStep && CountTiles(IsNumberOne) >= 1 },
+                new TaskItem { Label = "Place a second 1 on another hex", Anchor = "Tile_1",
+                    Done = () => boardChangedSinceStep && CountTiles(IsNumberOne) >= 2 },
+                new TaskItem { Label = "Place a + touching both 1s", Anchor = "Tile_+",
+                    Done = () => boardChangedSinceStep && PlusAdjacentToBothOnes() }
+            },
+            Locks = first => SetLocks(
+                first < 3 ? new[] { "1" } : new[] { "+" },
+                true, false, first >= 1, false, false, false, false, false)
         });
 
-        // ---- how coding works
+        // ---- authoring
         steps.Add(new Step
         {
-            Text = "HOW CODING WORKS: click a cell - that is where your instruction will go. Then click a tile on the board - it becomes the SUBJECT of your instruction. You then have three options.",
+            Text = "Click a cell, then a tile - that's the subject. SPACE spawns it as a node. Middle-click a cell to clear its instruction.",
             Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
-        });
-        steps.Add(new Step
-        {
-            Text = "SPACE spawns the subject's number as a node. Z moves the node sitting on it. C operates the node sitting on it. You'll use each one in a moment.",
-            Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
-        });
-        steps.Add(new Step
-        {
-            Text = "Click the first cell. Whatever you build next will be written here.",
-            Anchor = "GridPanel",
-            Locks = () => SetLocks(null, false, true, false, false, false, false, false, false),
-            Done = () => sawCellSelection
-        });
-        steps.Add(new Step
-        {
-            Text = "Click one of the 1s on the board, then press SPACE. Every tile that takes part in the sum needs its own node - so you'll spawn both 1s.",
-            Hint = "SPACE = spawn the number",
-            Anchor = "BOARD",
-            Locks = () => SetLocks(null, false, true, false, false, true, false, false, false),
-            Done = () => gridChangedSinceStep && CountInstructions<SelectInstructionData>() >= 1
-        });
-        steps.Add(new Step
-        {
-            Text = "Now click the OTHER 1, then press SPACE again. 1 + 1 needs a node on both tiles - without the second node the operation will fail.",
-            Hint = "SPACE = spawn the number",
-            Anchor = "BOARD",
-            Locks = () => SetLocks(null, false, true, false, false, true, false, false, false),
-            Done = () => gridChangedSinceStep && CountInstructions<SelectInstructionData>() >= 2
-        });
-
-        // ---- the operation
-        steps.Add(new Step
-        {
-            Text = "Nothing happens yet - nodes only appear when you press Play. Now the math. C operates the node on a tile: it highlights every adjacent OPERATOR you can use (making 1+), then every adjacent tile WITH A NODE you can operate with (making 1+1).",
-            Anchor = "BOARD",
-            ContinueButton = true,
-            Locks = LockAll
-        });
-        steps.Add(new Step
-        {
-            Text = "Click the same 1, press C, then click the + it highlights.",
-            Hint = "C = operate on the node",
-            Anchor = "BOARD",
-            Locks = () => SetLocks(null, false, true, false, false, false, true, false, true),
-            Done = () => authoring != null && authoring.IsAwaitingOperands
-        });
-        steps.Add(new Step
-        {
-            Text = "Now it highlights the operands - click the OTHER 1, then press D to confirm the instruction.",
-            Hint = "D = confirm",
-            Anchor = "BOARD",
-            Locks = () => SetLocks(null, false, true, false, false, false, true, false, true),
-            Done = () => gridChangedSinceStep && AnyCellHas<OperationInstructionData>()
+            Tasks =
+            {
+                new TaskItem { Label = "Click the first cell (P1, column 1)", Anchor = "GridPanel",
+                    Done = () => sawCellSelection },
+                new TaskItem { Label = "Spawn a node: click a 1, press SPACE", Anchor = "GridPanel",
+                    Done = () => CountInstructions<SelectInstructionData>() >= 1 },
+                new TaskItem { Label = "Spawn the second 1's node too", Anchor = "GridPanel",
+                    Done = () => CountInstructions<SelectInstructionData>() >= 2 },
+                new TaskItem { Label = "Press C on a 1, then click the +", Anchor = "BOARD",
+                    Done = () => authoring != null && authoring.IsAwaitingOperands },
+                new TaskItem { Label = "Click the other 1, press D to confirm", Anchor = "GridPanel",
+                    Done = () => AnyCellHas<OperationInstructionData>() }
+            },
+            Locks = first =>
+            {
+                if (first <= 0) SetLocks(null, false, true, false, false, false, false, false, false);
+                else if (first <= 2) SetLocks(null, false, true, false, false, true, false, false, false);
+                else SetLocks(null, false, true, false, false, false, true, false, true);
+            }
         });
 
         // ---- first run
         steps.Add(new Step
         {
-            Text = "Press Play. The first two columns spawn nodes on both 1s. The third merges 1+1 into 2 and moves it onto the + tile.",
+            Text = "Press PLAY and watch 1+1 become 2.",
             Anchor = "PlayButton",
-            // Unlock only Play; reset engine flags so Done watches THIS run.
-            Locks = () =>
+            Tasks =
             {
-                SetLocks(null, false, false, false, true, false, false, false, false);
-                executionStarted = false;
-                executionFinished = false;
+                new TaskItem { Label = "Press Play", Anchor = "PlayButton",
+                    Done = () => executionStarted && executionFinished && !puzzleWon }
             },
-            Done = () => executionStarted && executionFinished && !puzzleWon
+            Locks = first => SetLocks(null, false, false, false, true, false, false, false, false)
         });
 
-        // ---- finish tile + delivery
+        // ---- grid editing tools (told, not tasked)
         steps.Add(new Step
         {
-            Text = "The 2 is sitting on the + tile. It needs a destination: place the finish tile. Click _ in the palette and place it on any empty hex - it wants the target number, 2.",
+            Text = "More tools: ENTER adds a processor. Right-click a row or column label to clear or delete it. Middle-click empties a cell.",
+            Anchor = "GridPanel",
+            InfoOnly = true
+        });
+
+        // ---- metrics
+        steps.Add(new Step
+        {
+            Text = "Your metrics: INSTR, CYCLES, PROCS. Bests are saved for every puzzle.",
+            Anchor = "MetricsPanel",
+            InfoOnly = true
+        });
+
+        // ---- finish tile + delivery + first win
+        steps.Add(new Step
+        {
+            Text = "The 2 needs a destination: place the _ finish tile, then Z-move onto it (D confirms).",
             Anchor = "TilePalette",
-            Locks = () => SetLocks("_", true, false, false, false, false, false, false, false),
-            Done = () => boardChangedSinceStep && HasFinalTile(out _)
-        });
-        steps.Add(new Step
-        {
-            Text = "Z moves a node. Click the + tile (where the 2 sits), press Z - every adjacent hex lights up as a move target. Click the finish tile, then press D.",
-            Hint = "Z = move, D = confirm",
-            Anchor = "BOARD",
-            Locks = () => SetLocks(null, false, true, false, false, false, false, true, true),
-            Done = () => gridChangedSinceStep && HasMoveToFinal()
-        });
-        steps.Add(new Step
-        {
-            Text = "Press Play. The 2 moves onto the finish tile - and the level is solved.",
-            Anchor = "PlayButton",
-            Locks = () =>
+            AutoAdvance = true,
+            Tasks =
             {
-                SetLocks(null, false, false, false, true, false, false, false, false);
-                puzzleWon = false;
+                new TaskItem { Label = "Place the _ finish tile on an empty hex", Anchor = "Tile__",
+                    Done = () => boardChangedSinceStep && HasFinalTile(out _) },
+                new TaskItem { Label = "Move: click the +, press Z, click _, then D", Anchor = "GridPanel",
+                    Done = () => HasMoveToFinal() },
+                new TaskItem { Label = "Press Play - WIN", Anchor = "PlayButton",
+                    Done = () => puzzleWon }
             },
-            // Winning the level completes the tutorial even if the recap is skipped.
-            Done = () =>
+            Locks = first =>
             {
-                if (puzzleWon)
-                {
-                    TutorialLauncher.MarkTutorialCompleted();
-                    return true;
-                }
-                return false;
+                if (first == 0) SetLocks(new[] { "_" }, true, false, false, false, false, false, false, false);
+                else if (first == 1) SetLocks(null, false, true, false, false, false, false, true, true);
+                else SetLocks(null, false, false, false, true, false, false, false, false);
             }
         });
 
-        // ---- controls recap, one key per popup
+        // ---- good job: close the results popup
         steps.Add(new Step
         {
-            Text = "Controls recap - SPACE: spawn the subject tile's number as a node.",
+            Text = "Good job! Click CONTINUE on the results screen.",
             Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
+            Tasks =
+            {
+                new TaskItem { Label = "Click CONTINUE", Anchor = "ContinueButton",
+                    Done = () => seenWinPopup && FindDeep(canvas.transform, "WinPopup") == null }
+            }
         });
+
+        // ---- the solutions window
         steps.Add(new Step
         {
-            Text = "Controls recap - C: operate on the node. Pick an adjacent operator, then adjacent operands.",
-            Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
+            Text = "SOLUTIONS saves every attempt with its metrics. Your bests live here.",
+            Anchor = "SolutionsButton",
+            Tasks =
+            {
+                new TaskItem { Label = "Open the Solutions window", Anchor = "SolutionsButton",
+                    Done = () => SolutionsPopupOpen() },
+                new TaskItem { Label = "Click NEW for a fresh solution", Anchor = null,
+                    Done = () => newSolutionRequested }
+            }
         });
+
+        // ---- optimisation: same-cycle spawns, inside the new solution
         steps.Add(new Step
         {
-            Text = "Controls recap - Z: move the node to any adjacent hex.",
-            Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
+            Text = "Rows are processors - they run in parallel. Columns are cycles - one per step. Put both 1-spawns in the SAME column on two processors: 4 cycles becomes 3.",
+            Anchor = "TilePalette",
+            AutoAdvance = true,
+            Tasks =
+            {
+                new TaskItem { Label = "Re-place the tiles: 1, 1, + and _", Anchor = "TilePalette",
+                    Done = () => OptimizationTilesPlaced() },
+                new TaskItem { Label = "Press ENTER for a second processor", Anchor = "GridPanel",
+                    Done = () => grid.ProcessorCount >= 2 },
+                new TaskItem { Label = "Spawn both 1s in column 1 (one per row)", Anchor = "GridPanel",
+                    Done = () => CountInColumn<SelectInstructionData>(0) >= 2 },
+                new TaskItem { Label = "Column 2: operate (C) 1 + 1 = 2", Anchor = "GridPanel",
+                    Done = () => CountInColumn<OperationInstructionData>(1) >= 1 },
+                new TaskItem { Label = "Column 3: move (Z) the 2 onto _", Anchor = "GridPanel",
+                    Done = () => CountInColumn<MoveInstructionData>(2) >= 1 && HasMoveToFinal() },
+                new TaskItem { Label = "Press Play - WIN in 3 cycles", Anchor = "PlayButton",
+                    Done = () => puzzleWon }
+            },
+            Locks = first =>
+            {
+                if (first == 0) SetLocks(new[] { "1", "+", "_" }, true, false, true, false, false, false, false, false);
+                else if (first == 1) SetLocks(null, false, false, false, false, false, false, false, false, true);
+                else if (first == 2) SetLocks(null, false, true, false, false, true, false, false, false);
+                else if (first == 3) SetLocks(null, false, true, false, false, false, true, false, true);
+                else if (first == 4) SetLocks(null, false, true, false, false, false, false, true, true);
+                else SetLocks(null, false, false, false, true, false, false, false, false);
+            }
         });
+
+        // ---- core loop finale
         steps.Add(new Step
         {
-            Text = "Controls recap - D confirms. Enter adds a processor row, Esc cancels, middle-click deletes a tile. Good luck!",
-            Anchor = "GridPanel",
-            ContinueButton = true,
-            Locks = LockAll
+            Text = "That's the loop: solve it, then optimise it. Chase your bests in SOLUTIONS. Good luck!",
+            Anchor = "MetricsPanel",
+            InfoOnly = true
         });
     }
     // ------------------------------------------------------------------- UI
 
-    // Construct the popup: border, panel, body/hint, Continue/Skip, waiting label, arrow.
-    private void BuildPopup()
+    // Construct the docked panel: outline, TUTORIAL header, body, divider,
+    // TASKS header, rows, Next + Skip.
+    private void BuildPanel()
     {
-        popupRoot = new GameObject("TutorialPopup", typeof(RectTransform));
-        popupRoot.transform.SetParent(canvas.transform, false);
-        RectTransform rootRT = popupRoot.GetComponent<RectTransform>();
-        rootRT.anchorMin = new Vector2(0.5f, 0.5f);
-        rootRT.anchorMax = new Vector2(0.5f, 0.5f);
-        rootRT.pivot = new Vector2(0.5f, 0.5f);
-        rootRT.sizeDelta = new Vector2(430f, 200f);
+        panelRoot = new GameObject("TutorialPanel", typeof(RectTransform));
+        panelRoot.transform.SetParent(canvas.transform, false);
+        panelRoot.transform.SetAsLastSibling();
+        panelRT = panelRoot.GetComponent<RectTransform>();
+        panelRT.anchorMin = new Vector2(1f, 0.5f);
+        panelRT.anchorMax = new Vector2(1f, 0.5f);
+        panelRT.pivot = new Vector2(1f, 0.5f);
+        panelRT.anchoredPosition = new Vector2(0f, 0f);
+        panelRT.sizeDelta = new Vector2(PanelWidth, InfoHeight);
 
         GameObject border = new GameObject("Border", typeof(RectTransform));
-        border.transform.SetParent(popupRoot.transform, false);
+        border.transform.SetParent(panelRoot.transform, false);
         ChamferedImage borderChamfer = border.AddComponent<ChamferedImage>();
         borderChamfer.Chamfer = 18f;
         borderChamfer.OutlineThickness = 4f;
@@ -635,68 +815,275 @@ public class TutorialRunner : MonoBehaviour
         panelChamfer.Chamfer = 18f;
         panelChamfer.color = HexlinkTheme.Panel;
         Stretch(panel.GetComponent<RectTransform>());
-        RectTransform panelRT = panel.GetComponent<RectTransform>();
-        panelRT.offsetMin = new Vector2(3f, 3f);
-        panelRT.offsetMax = new Vector2(-3f, -3f);
+        RectTransform fillRT = panel.GetComponent<RectTransform>();
+        fillRT.offsetMin = new Vector2(3f, 3f);
+        fillRT.offsetMax = new Vector2(-3f, -3f);
+
+        GameObject titleGO = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+        titleGO.transform.SetParent(panel.transform, false);
+        TextMeshProUGUI titleTMP = titleGO.GetComponent<TextMeshProUGUI>();
+        titleTMP.text = "TUTORIAL";
+        titleTMP.fontSize = Mathf.Max(8f, Mathf.Round(26f * GameOptions.UiScale));
+        titleTMP.fontStyle = FontStyles.Bold;
+        titleTMP.color = OutlineBlue;
+        titleTMP.alignment = TextAlignmentOptions.Center;
+        titleTMP.raycastTarget = false;
+        RectTransform titleRT = titleGO.GetComponent<RectTransform>();
+        titleRT.anchorMin = new Vector2(0f, 1f);
+        titleRT.anchorMax = new Vector2(1f, 1f);
+        titleRT.pivot = new Vector2(0.5f, 1f);
+        titleRT.anchoredPosition = new Vector2(0f, -HeaderTop);
+        titleRT.sizeDelta = new Vector2(-32f, HeaderHeight);
 
         GameObject bodyGO = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
         bodyGO.transform.SetParent(panel.transform, false);
         bodyText = bodyGO.GetComponent<TextMeshProUGUI>();
-        bodyText.fontSize = Mathf.Max(8f, Mathf.Round(15f * GameOptions.UiScale));
+        bodyText.fontSize = Mathf.Max(8f, Mathf.Round(18f * GameOptions.UiScale));
         bodyText.color = HexlinkTheme.TextLight;
         bodyText.alignment = TextAlignmentOptions.TopLeft;
         RectTransform bodyRT = bodyGO.GetComponent<RectTransform>();
         bodyRT.anchorMin = new Vector2(0f, 1f);
         bodyRT.anchorMax = new Vector2(1f, 1f);
         bodyRT.pivot = new Vector2(0.5f, 1f);
-        bodyRT.anchoredPosition = new Vector2(0f, -16f);
-        bodyRT.sizeDelta = new Vector2(-32f, 108f);
+        bodyRT.anchoredPosition = new Vector2(0f, -BodyTop);
+        bodyRT.sizeDelta = new Vector2(-32f, BodyHeight);
 
-        GameObject hintGO = new GameObject("Hint", typeof(RectTransform), typeof(TextMeshProUGUI));
-        hintGO.transform.SetParent(panel.transform, false);
-        hintText = hintGO.GetComponent<TextMeshProUGUI>();
-        hintText.fontSize = Mathf.Max(8f, Mathf.Round(12f * GameOptions.UiScale));
-        hintText.fontStyle = FontStyles.Italic;
-        hintText.color = HexlinkTheme.TextGray;
-        hintText.alignment = TextAlignmentOptions.TopLeft;
-        RectTransform hintRT = hintGO.GetComponent<RectTransform>();
-        hintRT.anchorMin = new Vector2(0f, 0f);
-        hintRT.anchorMax = new Vector2(1f, 0f);
-        hintRT.pivot = new Vector2(0.5f, 0f);
-        hintRT.anchoredPosition = new Vector2(0f, 40f);
-        hintRT.sizeDelta = new Vector2(-32f, 26f);
+        divider = new GameObject("Divider", typeof(RectTransform), typeof(Image));
+        divider.transform.SetParent(panel.transform, false);
+        Image dividerImage = divider.GetComponent<Image>();
+        dividerImage.color = HexlinkTheme.Divider;
+        dividerImage.raycastTarget = false;
+        RectTransform dividerRT = divider.GetComponent<RectTransform>();
+        dividerRT.anchorMin = new Vector2(0f, 1f);
+        dividerRT.anchorMax = new Vector2(1f, 1f);
+        dividerRT.pivot = new Vector2(0.5f, 1f);
+        dividerRT.anchoredPosition = new Vector2(0f, -DividerY);
+        dividerRT.sizeDelta = new Vector2(-28f, 2f);
 
-        continueButton = CreateButton(panel.transform, "ContinueButton", "Continue", new Vector2(-70f, 8f), 120f, 32f, true);
-        continueButton.onClick.AddListener(NextStep);
+        GameObject headerGO = new GameObject("TasksHeader", typeof(RectTransform), typeof(TextMeshProUGUI));
+        headerGO.transform.SetParent(panel.transform, false);
+        tasksHeader = headerGO;
+        TextMeshProUGUI headerTMP = headerGO.GetComponent<TextMeshProUGUI>();
+        headerTMP.text = "TASKS";
+        headerTMP.fontSize = Mathf.Max(8f, Mathf.Round(14f * GameOptions.UiScale));
+        headerTMP.fontStyle = FontStyles.Bold;
+        headerTMP.color = HexlinkTheme.TextGray;
+        headerTMP.alignment = TextAlignmentOptions.Left;
+        headerTMP.raycastTarget = false;
+        RectTransform headerRT = headerGO.GetComponent<RectTransform>();
+        headerRT.anchorMin = new Vector2(0f, 1f);
+        headerRT.anchorMax = new Vector2(1f, 1f);
+        headerRT.pivot = new Vector2(0.5f, 1f);
+        headerRT.anchoredPosition = new Vector2(0f, -TasksHeaderY);
+        headerRT.sizeDelta = new Vector2(-32f, 20f);
 
-        Button skipButton = CreateButton(panel.transform, "SkipButton", "Skip", new Vector2(72f, 8f), 90f, 28f, false);
+        // Full-width container so rows anchor to the panel's left edge.
+        GameObject rowsGO = new GameObject("TaskRows", typeof(RectTransform));
+        rowsGO.transform.SetParent(panel.transform, false);
+        taskRows = rowsGO.GetComponent<RectTransform>();
+        taskRows.anchorMin = new Vector2(0f, 1f);
+        taskRows.anchorMax = new Vector2(1f, 1f);
+        taskRows.pivot = new Vector2(0.5f, 1f);
+        taskRows.anchoredPosition = new Vector2(0f, -RowsY);
+        taskRows.sizeDelta = new Vector2(0f, 0f);
+
+        nextButton = CreateButton(panel.transform, "NextButton", "Next", new Vector2(-105f, 16f), 190f, 40f, true);
+        nextButton.onClick.AddListener(NextStep);
+        nextGroup = nextButton.gameObject.AddComponent<CanvasGroup>();
+
+        Button skipButton = CreateButton(panel.transform, "SkipButton", "Skip", new Vector2(105f, 16f), 190f, 40f, false);
         skipButton.onClick.AddListener(() => EndTutorial(false));
 
-        GameObject waitingGO = new GameObject("WaitingLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
-        waitingGO.transform.SetParent(panel.transform, false);
-        waitingText = waitingGO.GetComponent<TextMeshProUGUI>();
-        waitingText.text = "waiting for you...";
-        waitingText.fontSize = Mathf.Max(8f, Mathf.Round(12f * GameOptions.UiScale));
-        waitingText.fontStyle = FontStyles.Italic;
-        waitingText.color = HexlinkTheme.TextGray;
-        waitingText.alignment = TextAlignmentOptions.Left;
-        RectTransform waitingRT = waitingGO.GetComponent<RectTransform>();
-        waitingRT.anchorMin = new Vector2(0f, 0f);
-        waitingRT.anchorMax = new Vector2(0f, 0f);
-        waitingRT.pivot = new Vector2(0f, 0f);
-        waitingRT.anchoredPosition = new Vector2(16f, 10f);
-        waitingRT.sizeDelta = new Vector2(200f, 24f);
+        ThemeSwitcher.ApplyToSubtree(panelRoot.transform);
+    }
 
-        GameObject arrowGO = new GameObject("Arrow", typeof(RectTransform));
-        arrowGO.transform.SetParent(popupRoot.transform, false);
-        arrow = arrowGO.AddComponent<ArrowImage>();
-        arrow.color = OutlineBlue;
-        arrow.raycastTarget = false;
-        RectTransform arrowRT = arrowGO.GetComponent<RectTransform>();
-        arrowRT.sizeDelta = new Vector2(22f, 18f);
+    // Spotlight scrim for info pages: four black bands framing a hole around
+    // the highlighted element. Sits directly below the panel; anything spawned
+    // later (popups) still renders above it. Non-blocking (no raycasts).
+    private void BuildDim()
+    {
+        dimRoot = new GameObject("TutorialDim", typeof(RectTransform));
+        dimRoot.transform.SetParent(canvas.transform, false);
+        Stretch(dimRoot.GetComponent<RectTransform>());
+
+        for (int i = 0; i < dimBands.Length; i++)
+        {
+            GameObject band = new GameObject("DimBand_" + i, typeof(RectTransform), typeof(Image));
+            band.transform.SetParent(dimRoot.transform, false);
+            dimBands[i] = band.GetComponent<Image>();
+            dimBands[i].color = DimColor;
+            dimBands[i].raycastTarget = false;
+            RectTransform bandRT = band.GetComponent<RectTransform>();
+            bandRT.anchorMin = new Vector2(0.5f, 0.5f);
+            bandRT.anchorMax = new Vector2(0.5f, 0.5f);
+            bandRT.pivot = new Vector2(0.5f, 0.5f);
+        }
+
+        dimRoot.SetActive(false);
+        panelRoot.transform.SetAsLastSibling();
+    }
+
+    // Re-lay the four bands so everything outside the hole is darkened. Runs
+    // every frame while the dim is visible so it tracks moving/collapsing UI.
+    private void RefreshDim()
+    {
+        RectTransform canvasRT = (RectTransform)canvas.transform;
+        Vector2 half = canvasRT.rect.size * 0.5f;
+
+        bool hasHole = false;
+        Rect hole = default;
+
+        if (dimHoleBoard)
+        {
+            HexGridSpawner spawner = FindAnyObjectByType<HexGridSpawner>();
+            if (spawner != null)
+            {
+                Vector2 point = RectTransformUtility.WorldToScreenPoint(Camera.main, spawner.transform.position);
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, point, null, out Vector2 local))
+                {
+                    hole = new Rect(local.x - 260f, local.y - 260f, 520f, 520f);
+                    hasHole = true;
+                }
+            }
+        }
+        else if (dimHoleTarget != null)
+        {
+            Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector3[] corners = new Vector3[4];
+            ((RectTransform)dimHoleTarget).GetWorldCorners(corners);
+
+            Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            foreach (Vector3 corner in corners)
+            {
+                Vector2 screen = RectTransformUtility.WorldToScreenPoint(uiCamera, corner);
+                if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, screen, uiCamera, out Vector2 local)) continue;
+                min = Vector2.Min(min, local);
+                max = Vector2.Max(max, local);
+            }
+
+            hole = Rect.MinMaxRect(min.x - HolePadding, min.y - HolePadding, max.x + HolePadding, max.y + HolePadding);
+            hasHole = true;
+        }
+
+        if (!hasHole)
+        {
+            // No target: dim everything except the panel (which sits above).
+            PlaceBand(0, Vector2.zero, canvasRT.rect.size);
+            PlaceBand(1, Vector2.zero, Vector2.zero);
+            PlaceBand(2, Vector2.zero, Vector2.zero);
+            PlaceBand(3, Vector2.zero, Vector2.zero);
+            return;
+        }
+
+        // Top: full width above the hole.
+        PlaceBand(0, new Vector2(0f, (hole.yMax + half.y) * 0.5f),
+            new Vector2(half.x * 2f, Mathf.Max(0f, half.y - hole.yMax)));
+        // Bottom: full width below the hole.
+        PlaceBand(1, new Vector2(0f, (-half.y + hole.yMin) * 0.5f),
+            new Vector2(half.x * 2f, Mathf.Max(0f, hole.yMin + half.y)));
+        // Left / right: hole-height strips flanking the hole.
+        PlaceBand(2, new Vector2((-half.x + hole.xMin) * 0.5f, hole.center.y),
+            new Vector2(Mathf.Max(0f, hole.xMin + half.x), hole.height));
+        PlaceBand(3, new Vector2((hole.xMax + half.x) * 0.5f, hole.center.y),
+            new Vector2(Mathf.Max(0f, half.x - hole.xMax), hole.height));
+    }
+
+    // Size and centre one dim band (canvas-local coordinates).
+    private void PlaceBand(int index, Vector2 center, Vector2 size)
+    {
+        if (dimBands[index] == null) return;
+        RectTransform rt = dimBands[index].rectTransform;
+        rt.anchoredPosition = center;
+        rt.sizeDelta = size;
+    }
+
+    // Dim + disable Next while tasks remain, brighten it when the page is done.
+    private void SetNextEnabled(bool enabled)
+    {
+        if (nextButton == null) return;
+        nextButton.interactable = enabled;
+        if (nextGroup != null) nextGroup.alpha = enabled ? 1f : 0.4f;
+    }
+
+    // Accent ring around whatever the current task refers to; BOARD is
+    // world-space so it gets no ring (the dim hole exposes it instead), and a
+    // missing name clears the ring.
+    private void UpdateHighlight(Step step, int firstIncomplete)
+    {
+        string anchor = step.Anchor;
+
+        if (firstIncomplete >= 0)
+        {
+            anchor = null;
+            for (int i = firstIncomplete; i < step.Tasks.Count; i++)
+            {
+                if (!taskDone[i] && !string.IsNullOrEmpty(step.Tasks[i].Anchor))
+                {
+                    anchor = step.Tasks[i].Anchor;
+                    break;
+                }
+            }
+            if (anchor == null) anchor = step.Anchor;
+        }
+
+        HighlightAnchor(anchor);
+    }
+
+    // (Re)build the ring; BOARD / unknown names just clear it. Also records
+    // the spotlight hole target for the info-page dim.
+    private void HighlightAnchor(string anchorName)
+    {
+        DestroyHighlight();
+        dimHoleTarget = null;
+        dimHoleBoard = false;
+        currentAnchorName = anchorName;
+
+        if (string.IsNullOrEmpty(anchorName)) return;
+        if (anchorName == "BOARD")
+        {
+            dimHoleBoard = true;
+            return;
+        }
+
+        Transform anchor = FindDeep(canvas.transform, anchorName);
+        if (anchor == null) return;
+        dimHoleTarget = anchor;
+
+        highlight = new GameObject("TutorialHighlight", typeof(RectTransform));
+        highlight.transform.SetParent(anchor, false);
+        ChamferedImage ring = highlight.AddComponent<ChamferedImage>();
+        ring.Chamfer = 18f;
+        ring.OutlineThickness = 8f;
+        ring.color = HexlinkTheme.Accent;
+        ring.raycastTarget = false;
+        RectTransform rt = highlight.GetComponent<RectTransform>();
+        Stretch(rt);
+        rt.offsetMin = new Vector2(-10f, -10f);
+        rt.offsetMax = new Vector2(10f, 10f);
+    }
+
+    private void DestroyHighlight()
+    {
+        if (highlight != null) Destroy(highlight);
+        highlight = null;
+    }
+
+    // Optionally mark done, release the gate, tear down panel and runner.
+    private void EndTutorial(bool markCompleted)
+    {
+        if (markCompleted || wonOnce) TutorialLauncher.MarkTutorialCompleted();
+        stepIndex = -1;
+        TutorialGate.UnlockAll();
+        if (inventoryUI != null) inventoryUI.RefreshPaletteAvailability();
+        if (panelRoot != null) Destroy(panelRoot);
+        if (dimRoot != null) Destroy(dimRoot);
+        DestroyHighlight();
+        Destroy(gameObject);
     }
 
     // Procedural button helper; accent = filled style, else ghost style.
+    // Label is centred - TMP defaults to top-left otherwise.
     private Button CreateButton(Transform parent, string name, string label, Vector2 position, float width, float height, bool accent)
     {
         GameObject buttonGO = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -718,168 +1105,12 @@ public class TutorialRunner : MonoBehaviour
         textGO.transform.SetParent(buttonGO.transform, false);
         TextMeshProUGUI tmp = textGO.GetComponent<TextMeshProUGUI>();
         tmp.text = label;
-        tmp.fontSize = Mathf.Max(8f, Mathf.Round(14f * GameOptions.UiScale));
+        tmp.fontSize = Mathf.Max(8f, Mathf.Round(18f * GameOptions.UiScale));
         tmp.fontStyle = FontStyles.Bold;
         tmp.color = accent ? HexlinkTheme.AccentText : HexlinkTheme.TextLight;
+        tmp.alignment = TextAlignmentOptions.Center;
         Stretch(textGO.GetComponent<RectTransform>());
         return button;
-    }
-
-    // Place the popup beside its anchor (right/above/below/left) and aim the arrow.
-    private void PositionForAnchor(string anchorName)
-    {
-        RectTransform canvasRT = (RectTransform)canvas.transform;
-        Rect anchorRect = GetAnchorRect(anchorName);
-
-        Vector2 size = ((RectTransform)popupRoot.transform).sizeDelta;
-        Vector2 half = canvasRT.rect.size * 0.5f;
-        const float gap = 60f;
-
-        // Canvas-local coordinates are centred on the canvas centre. Try the
-        // four sides and keep the first that fits entirely on screen, so the
-        // popup never ends up covering the thing it points at.
-        string direction;
-        Vector2 center;
-
-        bool fitsRight = anchorRect.xMax + gap + size.x <= half.x;
-        bool fitsAbove = anchorRect.yMax + gap + size.y <= half.y;
-        bool fitsBelow = anchorRect.yMin - gap - size.y >= -half.y;
-        bool fitsLeft = anchorRect.xMin - gap - size.x >= -half.x;
-
-        if (fitsRight)
-        {
-            direction = "right";
-            center = new Vector2(anchorRect.xMax + gap + size.x * 0.5f, anchorRect.center.y);
-        }
-        else if (fitsAbove)
-        {
-            direction = "above";
-            center = new Vector2(anchorRect.center.x, anchorRect.yMax + gap + size.y * 0.5f);
-        }
-        else if (fitsBelow)
-        {
-            direction = "below";
-            center = new Vector2(anchorRect.center.x, anchorRect.yMin - gap - size.y * 0.5f);
-        }
-        else if (fitsLeft)
-        {
-            direction = "left";
-            center = new Vector2(anchorRect.xMin - gap - size.x * 0.5f, anchorRect.center.y);
-        }
-        else
-        {
-            direction = "above";
-            center = new Vector2(anchorRect.center.x, anchorRect.yMax + gap + size.y * 0.5f);
-        }
-
-        center.x = Mathf.Clamp(center.x, -half.x + size.x * 0.5f + 8f, half.x - size.x * 0.5f - 8f);
-        center.y = Mathf.Clamp(center.y, -half.y + size.y * 0.5f + 8f, half.y - size.y * 0.5f - 8f);
-
-        ((RectTransform)popupRoot.transform).anchoredPosition = center;
-        popupRoot.transform.SetAsLastSibling();
-
-        // Aim the arrow at the anchor from the popup's near edge.
-        RectTransform arrowRT = (RectTransform)arrow.transform;
-        float clampX = size.x * 0.5f - 24f;
-        float clampY = size.y * 0.5f - 24f;
-        switch (direction)
-        {
-            case "right":
-                arrowRT.anchorMin = new Vector2(0f, 0.5f);
-                arrowRT.anchorMax = new Vector2(0f, 0.5f);
-                arrowRT.pivot = new Vector2(0.5f, 0.5f);
-                arrowRT.anchoredPosition = new Vector2(-10f, Mathf.Clamp(anchorRect.center.y - center.y, -clampY, clampY));
-                arrowRT.localEulerAngles = new Vector3(0f, 0f, 90f);
-                break;
-            case "left":
-                arrowRT.anchorMin = new Vector2(1f, 0.5f);
-                arrowRT.anchorMax = new Vector2(1f, 0.5f);
-                arrowRT.pivot = new Vector2(0.5f, 0.5f);
-                arrowRT.anchoredPosition = new Vector2(10f, Mathf.Clamp(anchorRect.center.y - center.y, -clampY, clampY));
-                arrowRT.localEulerAngles = new Vector3(0f, 0f, 270f);
-                break;
-            case "below":
-                arrowRT.anchorMin = new Vector2(0.5f, 1f);
-                arrowRT.anchorMax = new Vector2(0.5f, 1f);
-                arrowRT.pivot = new Vector2(0.5f, 0.5f);
-                arrowRT.anchoredPosition = new Vector2(Mathf.Clamp(anchorRect.center.x - center.x, -clampX, clampX), 10f);
-                arrowRT.localEulerAngles = new Vector3(0f, 0f, 0f);
-                break;
-            default: // above
-                arrowRT.anchorMin = new Vector2(0.5f, 0f);
-                arrowRT.anchorMax = new Vector2(0.5f, 0f);
-                arrowRT.pivot = new Vector2(0.5f, 0.5f);
-                arrowRT.anchoredPosition = new Vector2(Mathf.Clamp(anchorRect.center.x - center.x, -clampX, clampX), -10f);
-                arrowRT.localEulerAngles = new Vector3(0f, 0f, 180f);
-                break;
-        }
-    }
-
-    // Screen-space rect of the anchor, converted into canvas-local
-    // coordinates (origin = canvas centre).
-    private Rect GetAnchorRect(string anchorName)
-    {
-        RectTransform canvasRT = (RectTransform)canvas.transform;
-        Camera uiCamera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-
-        if (anchorName == "BOARD")
-        {
-            HexGridSpawner spawner = FindAnyObjectByType<HexGridSpawner>();
-            Vector3 world = spawner != null ? spawner.transform.position : Vector3.zero;
-            Vector2 point = RectTransformUtility.WorldToScreenPoint(Camera.main, world);
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, point, uiCamera, out Vector2 local))
-            {
-                return new Rect(local.x - 40f, local.y - 40f, 80f, 80f);
-            }
-            return new Rect(0f, 0f, 80f, 80f);
-        }
-
-        Transform anchor = FindDeep(canvas.transform, anchorName);
-        if (anchor == null) return new Rect(0f, 0f, 80f, 80f);
-
-        Vector3[] corners = new Vector3[4];
-        ((RectTransform)anchor).GetWorldCorners(corners);
-
-        Vector2 min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
-        Vector2 max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
-        foreach (Vector3 corner in corners)
-        {
-            Vector2 screen = RectTransformUtility.WorldToScreenPoint(uiCamera, corner);
-            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRT, screen, uiCamera, out Vector2 local)) continue;
-            min = Vector2.Min(min, local);
-            max = Vector2.Max(max, local);
-        }
-        return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
-    }
-
-    // Accent ring around the anchored element; BOARD is world-space, so skip it.
-    private void HighlightAnchor(string anchorName)
-    {
-        if (anchorName == "BOARD") return;
-
-        Transform anchor = FindDeep(canvas.transform, anchorName);
-        if (anchor == null) return;
-
-        highlight = new GameObject("TutorialHighlight", typeof(RectTransform));
-        highlight.transform.SetParent(anchor, false);
-        ChamferedImage ring = highlight.AddComponent<ChamferedImage>();
-        ring.Chamfer = 18f;
-        ring.OutlineThickness = 5f;
-        ring.color = HexlinkTheme.Accent;
-        ring.raycastTarget = false;
-        RectTransform rt = highlight.GetComponent<RectTransform>();
-        Stretch(rt);
-        rt.offsetMin = new Vector2(-8f, -8f);
-        rt.offsetMax = new Vector2(8f, 8f);
-    }
-
-    private void DestroyHighlight()
-    {
-        if (highlight != null)
-        {
-            Destroy(highlight);
-            highlight = null;
-        }
     }
 
     // Depth-first search for a transform by name.
