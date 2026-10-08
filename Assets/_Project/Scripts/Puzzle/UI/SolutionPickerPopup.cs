@@ -51,7 +51,7 @@ public static class SolutionPickerPopup
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null || puzzleData == null) return;
 
         puzzle = puzzleData;

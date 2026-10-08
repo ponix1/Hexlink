@@ -46,16 +46,8 @@ public static class BackButtonSpawner
             if (canvas.transform.Find("BackButton") != null) return;
         }
 
-        // Attach to the first root canvas found.
-        Canvas mainCanvas = null;
-        foreach (Canvas canvas in canvases)
-        {
-            if (canvas.isRootCanvas)
-            {
-                mainCanvas = canvas;
-                break;
-            }
-        }
+        // Attach to the scene's own root canvas — never a persistent one.
+        Canvas mainCanvas = UIRoot.FindSceneCanvas();
         if (mainCanvas == null) return;
 
         GameObject button = new GameObject("BackButton", typeof(RectTransform), typeof(Image), typeof(Button));

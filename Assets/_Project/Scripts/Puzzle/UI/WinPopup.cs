@@ -26,7 +26,7 @@ public static class WinPopup
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null) return;
 
         root = new GameObject("WinPopup", typeof(RectTransform), typeof(Image), typeof(Button), typeof(CanvasGroup));
@@ -138,7 +138,7 @@ public static class WinPopup
         leaveButton.GetComponent<Button>().onClick.AddListener(() =>
         {
             Close();
-            SceneManager.LoadScene(leaveScene);
+            SceneTransition.To(leaveScene);
         });
         RectTransform leaveRT = leaveButton.GetComponent<RectTransform>();
         leaveRT.anchorMin = new Vector2(0.5f, 0f);
@@ -158,7 +158,7 @@ public static class WinPopup
                 PuzzleSelection.SelectedPuzzle = next;
                 PuzzleSelection.ReturnScene = "Level_Select";
                 SolutionStore.PendingIndex = SolutionStore.PendingNew;
-                SceneManager.LoadScene("Puzzle_Play");
+                SceneTransition.To("Puzzle_Play");
             });
             RectTransform nextRT = nextButton.GetComponent<RectTransform>();
             nextRT.anchorMin = new Vector2(0.5f, 0f);

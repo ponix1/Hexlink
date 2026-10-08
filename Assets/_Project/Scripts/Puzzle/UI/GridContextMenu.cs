@@ -15,7 +15,7 @@ public static class GridContextMenu
     {
         Close();
 
-        Canvas canvas = UnityEngine.Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null || entries == null || entries.Length == 0) return;
 
         GameObject root = new GameObject("GridContextMenu");

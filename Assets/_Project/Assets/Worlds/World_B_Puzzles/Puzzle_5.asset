@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b42c155c5684eee43a8691ff4bab35e2, type: 3}
   m_Name: Puzzle_5
   m_EditorClassIdentifier: Assembly-CSharp::StandardPuzzleData
-  puzzleID: WA-5
-  puzzleTitle: A-5
+  puzzleID: WB-5
+  puzzleTitle: B-5
   layoutCells:
   - coordinate:
       q: -1
@@ -23,9 +23,12 @@ MonoBehaviour:
       r: 0
   - coordinate:
       q: 0
-      r: -1
+      r: 0
   - coordinate:
       q: 0
+      r: -1
+  - coordinate:
+      q: 1
       r: 0
   - coordinate:
       q: 1
@@ -35,10 +38,11 @@ MonoBehaviour:
       r: 1
   - coordinate:
       q: 1
-      r: 0
-  hasMapPosition: 0
-  mapPosition: {x: 0, y: 0}
-  targetScore: 50
-  availableNumbers: 05000000
+      r: -2
+  - coordinate:
+      q: -1
+      r: 2
+  targetScore: 567
+  availableNumbers: 050000000600000007000000
   disabledOperations: []
-  starRating: 3
+  starRating: 5

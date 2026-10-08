@@ -16,14 +16,8 @@ MonoBehaviour:
   puzzleTitle: A-4
   layoutCells:
   - coordinate:
-      q: 0
-      r: 1
-  - coordinate:
       q: -1
       r: 1
-  - coordinate:
-      q: 0
-      r: 0
   - coordinate:
       q: -1
       r: 0
@@ -31,12 +25,20 @@ MonoBehaviour:
       q: 0
       r: -1
   - coordinate:
-      q: 1
+      q: 0
       r: 0
   - coordinate:
       q: 1
       r: -1
-  targetScore: 456
-  availableNumbers: 040000000500000006000000
+  - coordinate:
+      q: 0
+      r: 1
+  - coordinate:
+      q: 1
+      r: 0
+  hasMapPosition: 0
+  mapPosition: {x: 0, y: 0}
+  targetScore: 40
+  availableNumbers: 04000000
   disabledOperations: []
-  starRating: 4
+  starRating: 3

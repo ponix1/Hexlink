@@ -170,7 +170,7 @@ public class TutorialRunner : MonoBehaviour
     // Resolve refs (abort if missing), hook gameplay events, build steps + panel.
     private void Start()
     {
-        canvas = FindAnyObjectByType<Canvas>();
+        canvas = UIRoot.FindSceneCanvas();
         inventoryUI = FindAnyObjectByType<TileInventoryUI>();
         grid = FindAnyObjectByType<GridController>();
         labelController = FindAnyObjectByType<HexTileLabelController>();

@@ -80,12 +80,12 @@ public class LevelNode : MonoBehaviour, IPointerEnterHandler, IPointerExitHandle
             selected =>
             {
                 SolutionStore.PendingIndex = selected;
-                SceneManager.LoadScene("Puzzle_Play");
+                SceneTransition.To("Puzzle_Play");
             },
             () =>
             {
                 SolutionStore.PendingIndex = SolutionStore.PendingNew;
-                SceneManager.LoadScene("Puzzle_Play");
+                SceneTransition.To("Puzzle_Play");
             });
     }
 

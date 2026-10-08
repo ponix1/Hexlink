@@ -73,12 +73,12 @@ public class PuzzleCardView : MonoBehaviour, IPointerEnterHandler
             index =>
             {
                 SolutionStore.PendingIndex = index;
-                SceneManager.LoadScene(puzzleSceneName);
+                SceneTransition.To(puzzleSceneName);
             },
             () =>
             {
                 SolutionStore.PendingIndex = SolutionStore.PendingNew;
-                SceneManager.LoadScene(puzzleSceneName);
+                SceneTransition.To(puzzleSceneName);
             });
     }
 

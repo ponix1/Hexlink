@@ -19,27 +19,26 @@ MonoBehaviour:
       q: -1
       r: 1
   - coordinate:
+      q: -1
+      r: 0
+  - coordinate:
+      q: 0
+      r: -1
+  - coordinate:
       q: 0
       r: 0
   - coordinate:
       q: 1
       r: -1
-  - coordinate:
-      q: 1
-      r: 0
   - coordinate:
       q: 0
       r: 1
   - coordinate:
       q: 1
-      r: -2
-  - coordinate:
-      q: -1
-      r: 2
-  - coordinate:
-      q: 0
-      r: -1
-  targetScore: 789
-  availableNumbers: 070000000800000009000000
+      r: 0
+  hasMapPosition: 0
+  mapPosition: {x: 0, y: 0}
+  targetScore: 70
+  availableNumbers: 07000000
   disabledOperations: []
-  starRating: 5
+  starRating: 3

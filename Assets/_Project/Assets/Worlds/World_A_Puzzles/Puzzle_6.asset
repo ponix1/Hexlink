@@ -17,6 +17,15 @@ MonoBehaviour:
   layoutCells:
   - coordinate:
       q: -1
+      r: 1
+  - coordinate:
+      q: -1
+      r: 0
+  - coordinate:
+      q: 0
+      r: -1
+  - coordinate:
+      q: 0
       r: 0
   - coordinate:
       q: 1
@@ -25,18 +34,11 @@ MonoBehaviour:
       q: 0
       r: 1
   - coordinate:
-      q: 0
-      r: 0
-  - coordinate:
       q: 1
       r: 0
-  - coordinate:
-      q: 0
-      r: -1
-  - coordinate:
-      q: 2
-      r: -2
-  targetScore: 678
-  availableNumbers: 060000000700000008000000
+  hasMapPosition: 0
+  mapPosition: {x: 0, y: 0}
+  targetScore: 60
+  availableNumbers: 06000000
   disabledOperations: []
-  starRating: 2
+  starRating: 3

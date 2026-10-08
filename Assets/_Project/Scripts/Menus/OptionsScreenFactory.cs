@@ -29,7 +29,7 @@ public static class OptionsScreenFactory
     {
         if (SceneManager.GetActiveScene().name != "Main Menu") return;
 
-        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null) return;
 
         Transform existing = canvas.transform.Find("OptionsScreen");

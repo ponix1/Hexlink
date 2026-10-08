@@ -16,9 +16,6 @@ MonoBehaviour:
   puzzleTitle: Level 3
   layoutCells:
   - coordinate:
-      q: 0
-      r: 0
-  - coordinate:
       q: 1
       r: 0
   - coordinate:
@@ -31,15 +28,18 @@ MonoBehaviour:
       q: -1
       r: 0
   - coordinate:
-      q: -1
+      q: 0
       r: 1
   - coordinate:
       q: 0
-      r: 1
+      r: 0
+  - coordinate:
+      q: 1
+      r: -2
   hasMapPosition: 1
   mapPosition: {x: -100, y: 100}
-  targetScore: 33
-  availableNumbers: 01000000020000000300000004000000
+  targetScore: 10
+  availableNumbers: 010000000200000003000000
   disabledOperations:
   - /
   starRating: 2

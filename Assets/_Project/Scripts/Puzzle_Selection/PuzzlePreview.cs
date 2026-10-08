@@ -38,7 +38,7 @@ public static class PuzzlePreview
     {
         if (SceneManager.GetActiveScene().name != SceneName) return;
 
-        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null) return;
         if (canvas.transform.Find("PuzzlePreview") != null) return;
 

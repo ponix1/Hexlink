@@ -43,7 +43,7 @@ public static class LevelMapFactory
     {
         if (SceneManager.GetActiveScene().name != "Level_Select") return;
 
-        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null) return;
 
         Transform existing = canvas.transform.Find("LevelMap");

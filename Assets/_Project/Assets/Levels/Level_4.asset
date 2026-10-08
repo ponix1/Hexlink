@@ -29,17 +29,17 @@ MonoBehaviour:
       r: -1
   - coordinate:
       q: -1
-      r: 0
-  - coordinate:
-      q: -1
       r: 1
   - coordinate:
       q: 0
       r: 1
+  - coordinate:
+      q: -1
+      r: 2
   hasMapPosition: 1
   mapPosition: {x: 200, y: -180}
-  targetScore: 45
-  availableNumbers: 020000000300000005000000
+  targetScore: 32
+  availableNumbers: 0200000004000000
   disabledOperations:
   - ^
   starRating: 2

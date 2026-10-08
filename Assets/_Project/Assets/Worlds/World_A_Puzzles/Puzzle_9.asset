@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b42c155c5684eee43a8691ff4bab35e2, type: 3}
-  m_Name: Puzzle_5
+  m_Name: Puzzle_9
   m_EditorClassIdentifier: Assembly-CSharp::StandardPuzzleData
-  puzzleID: WA-5
-  puzzleTitle: A-5
+  puzzleID: WA-9
+  puzzleTitle: A-9
   layoutCells:
   - coordinate:
       q: -1
@@ -38,7 +38,7 @@ MonoBehaviour:
       r: 0
   hasMapPosition: 0
   mapPosition: {x: 0, y: 0}
-  targetScore: 50
-  availableNumbers: 05000000
+  targetScore: 90
+  availableNumbers: 09000000
   disabledOperations: []
   starRating: 3

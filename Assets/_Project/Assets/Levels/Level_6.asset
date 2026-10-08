@@ -36,9 +36,15 @@ MonoBehaviour:
   - coordinate:
       q: 0
       r: 1
+  - coordinate:
+      q: -1
+      r: 2
+  - coordinate:
+      q: 1
+      r: -2
   hasMapPosition: 1
   mapPosition: {x: 1640, y: -260}
-  targetScore: 121
+  targetScore: 60
   availableNumbers: 020000000300000005000000
   disabledOperations:
   - /

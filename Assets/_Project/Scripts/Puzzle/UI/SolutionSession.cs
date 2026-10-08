@@ -25,7 +25,7 @@ public static class SolutionSessionSpawner
     {
         if (SceneManager.GetActiveScene().name != "Puzzle_Play") return;
 
-        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null) return;
         if (canvas.transform.Find("SolutionSession") != null) return;
 

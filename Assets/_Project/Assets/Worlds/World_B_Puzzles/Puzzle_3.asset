@@ -14,8 +14,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StandardPuzzleData
   puzzleID: WB-3
   puzzleTitle: B-3
-  targetScore: 30
-  availableNumbers: 03000000
-  availableOperations: []
-  layout: 2
-  starRating: 3
+  layoutCells:
+  - coordinate:
+      q: 0
+      r: 1
+  - coordinate:
+      q: 0
+      r: 0
+  - coordinate:
+      q: -1
+      r: 0
+  - coordinate:
+      q: 0
+      r: -1
+  - coordinate:
+      q: 1
+      r: -1
+  - coordinate:
+      q: 1
+      r: 0
+  - coordinate:
+      q: -1
+      r: 1
+  hasMapPosition: 0
+  mapPosition: {x: 0, y: 0}
+  targetScore: 345
+  availableNumbers: 030000000400000005000000
+  disabledOperations: []
+  starRating: 1

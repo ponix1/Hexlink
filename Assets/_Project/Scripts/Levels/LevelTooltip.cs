@@ -30,7 +30,7 @@ public static class LevelTooltip
     // Build once, fill, position over the node, activate.
     public static void Show(PuzzleData data, RectTransform anchor)
     {
-        Canvas canvas = Object.FindAnyObjectByType<Canvas>();
+        Canvas canvas = UIRoot.FindSceneCanvas();
         if (canvas == null || anchor == null) return;
 
         if (root == null) Build(canvas.transform);

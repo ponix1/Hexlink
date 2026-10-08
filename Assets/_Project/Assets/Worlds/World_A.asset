@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WorldData
   worldName: World A
   puzzles:
-  - {fileID: 11400000, guid: 6e38235c2db350047aad0c878651c97a, type: 2}
-  - {fileID: 11400000, guid: 586e3e3ba1b802f4aa608ed5541e00e9, type: 2}
-  - {fileID: 11400000, guid: 749f6a681d137b94c9df6594d2c8529c, type: 2}
-  - {fileID: 11400000, guid: 9e298de7e9cfd9d4a9d9a31971d71a08, type: 2}
-  - {fileID: 11400000, guid: 984aca752a8bce24994564647a4c2b05, type: 2}
-  - {fileID: 11400000, guid: 7f88a1a8074047e468d9f1d4c8ae1fb6, type: 2}
-  - {fileID: 11400000, guid: 7c915840e94eb0048b31fd7d310874c1, type: 2}
+  - {fileID: 11400000, guid: 87d4dfe9bc9b2b2409e1fc8785abf7b0, type: 2}
+  - {fileID: 11400000, guid: 36c553ab03e7ad443b5e12431e736e0c, type: 2}
+  - {fileID: 11400000, guid: 17e1603858cd0db43a4c83ba2a5d30fa, type: 2}
+  - {fileID: 11400000, guid: 12fbd92d2909d584aae9a8d8e6c08c10, type: 2}
+  - {fileID: 11400000, guid: 8f0c984ab79849449b40159f96e390ae, type: 2}
+  - {fileID: 11400000, guid: de4c9959dbaba364a8ffd0bb178f0629, type: 2}
+  - {fileID: 11400000, guid: 2162f1a4476e99c48aa2893e5f8ee29e, type: 2}
+  - {fileID: 11400000, guid: dad319b5f47b3aa4d9cf508da903c80f, type: 2}
+  - {fileID: 11400000, guid: 4e24e37a32d9ce84896763303a3433d0, type: 2}
